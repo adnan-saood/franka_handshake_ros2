@@ -1,7 +1,6 @@
 [submodule "franka_ros2"]
 	path = franka_ros2
 	url = https://github.com/frankarobotics/franka_ros2
-
 [submodule "mekahand_description"]
 	path = mekahand_description
-	url = https://github.com/adnan-saood/mekahand_description
+	url = git@github.com:adnan-saood/mekahand_description.git
