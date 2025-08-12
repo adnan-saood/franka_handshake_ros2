@@ -28,10 +28,9 @@ def robot_state_publisher_spawner(context: LaunchContext, arm_id, load_gripper, 
     load_gripper_str = context.perform_substitution(load_gripper)
     ee_id_str = context.perform_substitution(ee_id)
     franka_xacro_filepath = os.path.join(
-        get_package_share_directory("franka_description"),
-        "robots",
-        arm_id_str,
-        arm_id_str + ".urdf.xacro",
+        get_package_share_directory("franka_handshake_description"),
+        "urdf",
+        "franka_handshake.urdf.xacro"
     )
     robot_description = xacro.process_file(
         franka_xacro_filepath, mappings={"hand": load_gripper_str, "ee_id": ee_id_str}
@@ -59,7 +58,7 @@ def generate_launch_description():
     arm_id = LaunchConfiguration(arm_id_parameter_name)
 
     rviz_file = os.path.join(
-        get_package_share_directory("franka_description"),
+        get_package_share_directory("franka_handshake_description"),
         "rviz",
         "visualize_franka.rviz",
     )
@@ -84,6 +83,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 arm_id_parameter_name,
+                default_value="fr3",
                 description="ID of the type of arm used. Supporter values: "
                 "fer, fr3, fp3, fr3v2",
             ),

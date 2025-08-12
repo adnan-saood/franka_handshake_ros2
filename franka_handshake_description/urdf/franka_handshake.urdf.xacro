@@ -13,14 +13,107 @@
   <xacro:include filename="$(find franka_handshake_description)/urdf/franka_handshake/franka_handshake_macro.xacro"/>
   <xacro:include filename="$(find franka_handshake_description)/urdf/franka_handshake/franka_handshake_macro.ros2_control.xacro"/>
 
-  <!-- create link fixed to the "world" -->
-  <link name="world" />
+  <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
 
-  <!-- Load robot's macro with parameters -->
-  <!-- set prefix if multiple robots are used -->
-  <xacro:franka_handshake prefix="$(arg prefix)" parent="world" >
-    <origin xyz="0 0 0" rpy="0 0 0" />          <!-- position robot in the world -->
-  </xacro:franka_handshake>
+  <xacro:include filename="$(find mekahand_description)/urdf/mekahand/mekahand_macro.xacro"/>
+
+
+  <!-- create link fixed to the "world" -->
+
+  <link name="world"/>
+
+  <joint name="world_to_base" type="fixed">
+  <parent link="world"/>
+  <child link="base"/> <!-- or whatever the root link of franka_robot is -->
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+</joint>
+
+  <xacro:arg name="arm_id" default="fr3" />
+
+  <!-- The prefix of the robot -->
+  <xacro:arg name="arm_prefix" default="" />
+
+  <!-- Don't print a prefix for joints, visuals, and links? -->
+  <xacro:arg name="no_prefix" default="false"/>
+
+  <!-- Should an end-effector be mounted at the flange?" -->
+  <xacro:arg name="hand" default="false" />
+
+  <!-- Which end-effector would be mounted at the flange?" -->
+  <xacro:arg name="ee_id" default="franka_hand" />
+
+  <!-- Where is the end-effector connected to, if different from the robot flange?  -->
+  <xacro:arg name="special_connection" default="" />
+
+  <!-- Position offset between ee and parent frame -->
+  <xacro:arg name="xyz_ee" default="0 0 0" />
+
+  <!-- Rotation offset between ee and parent frame -->
+  <xacro:arg name="rpy_ee" default= "0 0 ${-pi/4}" />
+
+  <!-- Position offset between ee frame and tcp frame -->
+  <xacro:arg name="tcp_xyz" default="0 0 0.1034" />
+
+  <!-- Rotation offset between ee frame and tcp frame -->
+  <xacro:arg name="tcp_rpy" default="0 0 0" />
+
+  <!-- Safety distance for the collision capsules -->
+  <xacro:arg name="safety_distance" default="0.03" />
+
+  <!-- Should self-collision be enabled? -->
+  <xacro:arg name="with_sc" default="false" />
+
+  <!-- Is the robot being controlled with ros2_control?" -->
+  <xacro:arg name="ros2_control" default="false" />
+
+  <!-- IP address or hostname of the robot" -->
+  <xacro:arg name="robot_ip" default="" />
+
+  <!-- Should a fake hardware be used? -->
+  <xacro:arg name="use_fake_hardware" default="false" />
+
+  <!-- Should fake sensors be used? -->
+  <xacro:arg name="fake_sensor_commands" default="false" />
+
+  <!-- Should the robot be spawned in Gazebo?" -->
+  <xacro:arg name="gazebo" default="false" />
+
+  <!-- Should the robot be spawned in Gazebo with effort interfaces?" -->
+  <xacro:arg name="gazebo_effort" default="false" />
+
+  <!-- Name of the description package -->
+  <xacro:arg name="description_pkg" default="franka_description" />
+  
+  <!-- Append an underscore to the user-provided prefix, if non-empty. -->
+  <xacro:property name="prefix" value="$(arg arm_prefix)"/>
+  <xacro:property name="modified_prefix" value="${prefix + '_' if prefix else ''}"/>
+
+  <xacro:franka_robot arm_id="fr3"
+                      joint_limits="${xacro.load_yaml('$(find franka_description)/robots/fr3/joint_limits.yaml')}"
+                      inertials="${xacro.load_yaml('$(find franka_description)/robots/fr3/inertials.yaml')}"
+                      kinematics="${xacro.load_yaml('$(find franka_description)/robots/fr3/kinematics.yaml')}"
+                      dynamics="${xacro.load_yaml('$(find franka_description)/robots/fr3/dynamics.yaml')}"
+                      gazebo="$(arg gazebo)"
+                      hand="$(arg hand)"
+                      special_connection="$(arg special_connection)"
+                      xyz_ee="$(arg xyz_ee)"
+                      rpy_ee="$(arg rpy_ee)"
+                      tcp_xyz="$(arg tcp_xyz)"
+                      tcp_rpy="$(arg tcp_rpy)"
+                      safety_distance="$(arg safety_distance)"
+                      with_sc="$(arg with_sc)"
+                      ros2_control="$(arg ros2_control)"
+                      robot_ip="$(arg robot_ip)"
+                      use_fake_hardware="$(arg use_fake_hardware)"
+                      fake_sensor_commands="$(arg fake_sensor_commands)"
+                      gazebo_effort="$(arg gazebo_effort)"
+                      no_prefix="$(arg no_prefix)"
+                      arm_prefix="${modified_prefix}"
+                      description_pkg="$(arg description_pkg)">
+  </xacro:franka_robot>
+
+
+
 
   <xacro:franka_handshake_ros2_control
     name="franka_handshake"
@@ -29,6 +122,13 @@
     mock_sensor_commands="$(arg mock_sensor_commands)"
     sim_gazebo_classic="$(arg sim_gazebo_classic)"
     sim_gazebo="$(arg sim_gazebo)"
-    simulation_controllers="$(arg simulation_controllers)" />
+    simulation_controllers="$(arg simulation_controllers)" /> 
+
+
+  
+  <!-- Define the Meka Hand using the macro -->
+  <xacro:mekahand prefix="" parent="fr3_link8">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:mekahand>
 
 </robot>

@@ -1,3 +1,5 @@
+# Exclude submodule_basics.md
+submodule_basics.md
 build/
 install/
 log/
