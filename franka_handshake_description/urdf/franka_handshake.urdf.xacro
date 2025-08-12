@@ -113,8 +113,6 @@
   </xacro:franka_robot>
 
 
-
-
   <xacro:franka_handshake_ros2_control
     name="franka_handshake"
     prefix="$(arg prefix)"
