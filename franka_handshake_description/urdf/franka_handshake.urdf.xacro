@@ -122,8 +122,6 @@
     sim_gazebo="$(arg sim_gazebo)"
     simulation_controllers="$(arg simulation_controllers)" /> 
 
-
-  
   <!-- Define the Meka Hand using the macro -->
   <xacro:mekahand prefix="" parent="fr3_link8">
     <origin xyz="0 0 0" rpy="0 0 0"/>
