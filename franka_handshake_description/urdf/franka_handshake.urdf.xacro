@@ -23,10 +23,10 @@
   <link name="world"/>
 
   <joint name="world_to_base" type="fixed">
-  <parent link="world"/>
-  <child link="base"/> <!-- or whatever the root link of franka_robot is -->
-  <origin xyz="0 0 0" rpy="0 0 0"/>
-</joint>
+    <parent link="world"/>
+    <child link="base"/> <!-- or whatever the root link of franka_robot is -->
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
 
   <xacro:arg name="arm_id" default="fr3" />
 
