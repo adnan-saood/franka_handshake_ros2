@@ -116,6 +116,12 @@
 
 
   <!-- Define the Meka Hand using the macro -->
+  <!-- @TODO: The meka hand description is removed for now because it has multiple tip links.
+  Either i have to patch the KDL ign plugin to accept a tip_link paramater, or i have to 
+  edit the URDF description so that the mekahand is passive and there are no active joints
+  in it. This is to be done by copying the franka_ign_ros2_control and patching it in the way i like.
+  The fail happens at the gravity compensation calculation. -->
+
   <!-- <xacro:mekahand prefix="" parent="fr3_link8">
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:mekahand> -->
