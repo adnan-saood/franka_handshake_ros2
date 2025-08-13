@@ -65,26 +65,26 @@ namespace franka_handshake_controllers
     updateJointStates();
     Vector7d q_goal = initial_q_;
 
-    Vector7d QS = initial_q_;
-    Vector7d Q1 = initial_q_;
-    Vector7d Q2 = initial_q_;
+    // Vector7d QS = initial_q_;
+    // Vector7d Q1 = initial_q_;
+    // Vector7d Q2 = initial_q_;
 
-    // add dQ_ to Q
-    Q1 += dQ1_;
-    Q2 += dQ2_;
+    // // add dQ_ to Q
+    // Q1 += dQ1_;
+    // Q2 += dQ2_;
 
-    elapsed_time_ = elapsed_time_ + period.seconds();
+    // elapsed_time_ = elapsed_time_ + period.seconds();
 
-    // Use hs_freq_ for cosine frequency
-    double omega = 2 * M_PI * hs_freq_;
-    double alpha = 0.5 + 0.5 * std::cos(omega * elapsed_time_);
-    static double last_print_time = 0.0;
-    if (elapsed_time_ - last_print_time >= 1.0) {
-      RCLCPP_INFO(get_node()->get_logger(), "Current handshake omega: %f", omega);
-      last_print_time = elapsed_time_;
-    }
-    // now move parameterically between Q1 and Q2
-    q_goal = (1 - alpha) * Q1 + alpha * Q2;
+    // // Use hs_freq_ for cosine frequency
+    // double omega = 2 * M_PI * hs_freq_;
+    // double alpha = 0.5 + 0.5 * std::cos(omega * elapsed_time_);
+    // static double last_print_time = 0.0;
+    // if (elapsed_time_ - last_print_time >= 1.0) {
+    //   RCLCPP_INFO(get_node()->get_logger(), "Current handshake omega: %f", omega);
+    //   last_print_time = elapsed_time_;
+    // }
+    // // now move parameterically between Q1 and Q2
+    // q_goal = (1 - alpha) * Q1 + alpha * Q2;
 
     const double kAlpha = 0.99;
     dq_filtered_ = (1 - kAlpha) * dq_filtered_ + kAlpha * dq_;
