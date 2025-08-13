@@ -4,3 +4,6 @@
 [submodule "mekahand_description"]
 	path = mekahand_description
 	url = git@github.com:adnan-saood/mekahand_description.git
+[submodule "franka_description"]
+	path = franka_description
+	url = https://github.com/frankarobotics/franka_description.git
