@@ -5,6 +5,8 @@ controller_manager:
     handshake_controller:
       type: "franka_handshake_controllers/HandShakeController"
       arm_id: "fr3"  # or whatever matches your URDF joint prefix
+      dQ1: [0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0]
+      dQ2: [0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 0.0]
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -27,3 +29,5 @@ handshake_controller:
       - 1.0
       - 1.0
       - 0.5
+    dQ1: [0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0]
+    dQ2: [0.0, 0.0, 0.0, -0.2, 0.0, 0.0, 0.0]

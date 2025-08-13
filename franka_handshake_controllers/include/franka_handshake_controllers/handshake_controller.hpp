@@ -19,15 +19,19 @@
 #include <Eigen/Eigen>
 #include <controller_interface/controller_interface.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/subscription.hpp>
+#include <std_msgs/msg/float64.hpp>
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
-namespace franka_handshake_controllers {
+namespace franka_handshake_controllers
+{
 
 /**
  * The joint impedance example controller moves joint 4 and 5 in a very compliant periodic movement.
  */
-class HandShakeController : public controller_interface::ControllerInterface {
+class HandShakeController : public controller_interface::ControllerInterface
+{
  public:
   using Vector7d = Eigen::Matrix<double, 7, 1>;
   [[nodiscard]] controller_interface::InterfaceConfiguration command_interface_configuration()
@@ -39,6 +43,11 @@ class HandShakeController : public controller_interface::ControllerInterface {
   CallbackReturn on_init() override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State& previous_state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
+
+ protected:
+  double hs_freq_{0.4};  // handshake frequency (Hz)
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr freq_sub_;
+  void freq_callback(const std_msgs::msg::Float64::SharedPtr msg);
 
  private:
   std::string arm_id_;
@@ -52,6 +61,8 @@ class HandShakeController : public controller_interface::ControllerInterface {
   Vector7d d_gains_;
   double elapsed_time_{0.0};
   void updateJointStates();
+
+  Vector7d dQ1_, dQ2_;
 };
 
-}  // namespace franka_example_controllers
+}  // namespace franka_handshake_controllers
