@@ -120,7 +120,7 @@ CallbackReturn HandShakeController::on_configure(
     RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
   }
 
-  arm_id_ = robot_utils::getRobotNameFromDescription(robot_description_, get_node()->get_logger());
+  arm_id_ = "fr3";
 
   return CallbackReturn::SUCCESS;
 }

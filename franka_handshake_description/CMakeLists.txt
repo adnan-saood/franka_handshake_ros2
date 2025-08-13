@@ -12,7 +12,7 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 install(
-  DIRECTORY config launch meshes rviz urdf test include mekahand src robots
+  DIRECTORY config launch meshes rviz urdf test include src robots
   DESTINATION share/${PROJECT_NAME}
 )
 

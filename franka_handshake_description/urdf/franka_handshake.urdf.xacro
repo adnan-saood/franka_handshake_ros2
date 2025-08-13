@@ -64,7 +64,7 @@
   <xacro:arg name="with_sc" default="false" />
 
   <!-- Is the robot being controlled with ros2_control?" -->
-  <xacro:arg name="ros2_control" default="false" />
+  <xacro:arg name="ros2_control" default="true" />
 
   <!-- IP address or hostname of the robot" -->
   <xacro:arg name="robot_ip" default="" />
@@ -113,18 +113,9 @@
   </xacro:franka_robot>
 
 
-  <xacro:franka_handshake_ros2_control
-    name="franka_handshake"
-    prefix="$(arg prefix)"
-    use_mock_hardware="$(arg use_mock_hardware)"
-    mock_sensor_commands="$(arg mock_sensor_commands)"
-    sim_gazebo_classic="$(arg sim_gazebo_classic)"
-    sim_gazebo="$(arg sim_gazebo)"
-    simulation_controllers="$(arg simulation_controllers)" /> 
-
   <!-- Define the Meka Hand using the macro -->
-  <xacro:mekahand prefix="" parent="fr3_link8">
+  <!-- <xacro:mekahand prefix="" parent="fr3_link8">
     <origin xyz="0 0 0" rpy="0 0 0"/>
-  </xacro:mekahand>
+  </xacro:mekahand> -->
 
 </robot>
