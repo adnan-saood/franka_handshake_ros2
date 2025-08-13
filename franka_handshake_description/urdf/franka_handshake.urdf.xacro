@@ -13,20 +13,22 @@
   <xacro:include filename="$(find franka_handshake_description)/urdf/franka_handshake/franka_handshake_macro.xacro"/>
   <xacro:include filename="$(find franka_handshake_description)/urdf/franka_handshake/franka_handshake_macro.ros2_control.xacro"/>
 
-  <xacro:include filename="$(find franka_description)/robots/common/franka_robot.xacro"/>
+  <xacro:include filename="$(find franka_handshake_description)/robots/common/franka_robot.xacro"/>
 
   <xacro:include filename="$(find mekahand_description)/urdf/mekahand/mekahand_macro.xacro"/>
 
 
   <!-- create link fixed to the "world" -->
 
-  <link name="world"/>
-
-  <joint name="world_to_base" type="fixed">
-    <parent link="world"/>
-    <child link="base"/> <!-- or whatever the root link of franka_robot is -->
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
+  
+  <xacro:if value="false">
+    <link name="my_base"/>
+    <joint name="my_base_to_base" type="fixed">
+      <parent link="my_base"/>
+      <child link="base"/> <!-- or whatever the root link of franka_robot is -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+  </xacro:if>
 
   <xacro:arg name="arm_id" default="fr3" />
 
