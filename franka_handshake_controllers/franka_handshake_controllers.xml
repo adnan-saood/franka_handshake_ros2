@@ -1,0 +1,8 @@
+<library path="franka_handshake_controllers">
+    <class name="franka_handshake_controllers/HandShakeController"
+           type="franka_handshake_controllers::HandShakeController" base_class_type="controller_interface::ControllerInterface">
+        <description>
+            The hand shake controller is responsible for managing the hand shake motion of the robot.
+        </description>
+    </class>
+</library>  
