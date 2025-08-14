@@ -79,6 +79,8 @@ class HandShakeController : public controller_interface::ControllerInterface
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr actual_pose_pub_;
   void freq_callback(const std_msgs::msg::Float64::SharedPtr msg);
 
+  void handle_action_server_progress(double elapsed_time);
+
 
 
 
