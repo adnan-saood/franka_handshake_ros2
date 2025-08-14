@@ -21,6 +21,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
@@ -47,6 +48,8 @@ class HandShakeController : public controller_interface::ControllerInterface
  protected:
   double hs_freq_{0.4};  // handshake frequency (Hz)
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr freq_sub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr commanded_pose_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr actual_pose_pub_;
   void freq_callback(const std_msgs::msg::Float64::SharedPtr msg);
 
  private:

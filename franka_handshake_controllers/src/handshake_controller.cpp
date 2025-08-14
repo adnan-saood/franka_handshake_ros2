@@ -65,26 +65,37 @@ namespace franka_handshake_controllers
     updateJointStates();
     Vector7d q_goal = initial_q_;
 
-    // Vector7d QS = initial_q_;
-    // Vector7d Q1 = initial_q_;
-    // Vector7d Q2 = initial_q_;
+    Vector7d QS = initial_q_;
+    Vector7d Q1 = initial_q_;
+    Vector7d Q2 = initial_q_;
 
-    // // add dQ_ to Q
-    // Q1 += dQ1_;
-    // Q2 += dQ2_;
+    // add dQ_ to Q
+    Q1 += dQ1_;
+    Q2 += dQ2_;
 
-    // elapsed_time_ = elapsed_time_ + period.seconds();
+    elapsed_time_ = elapsed_time_ + period.seconds();
 
-    // // Use hs_freq_ for cosine frequency
-    // double omega = 2 * M_PI * hs_freq_;
-    // double alpha = 0.5 + 0.5 * std::cos(omega * elapsed_time_);
-    // static double last_print_time = 0.0;
-    // if (elapsed_time_ - last_print_time >= 1.0) {
-    //   RCLCPP_INFO(get_node()->get_logger(), "Current handshake omega: %f", omega);
-    //   last_print_time = elapsed_time_;
-    // }
-    // // now move parameterically between Q1 and Q2
+    // Use hs_freq_ for cosine frequency
+    double omega = 2 * M_PI * hs_freq_;
+    double alpha = 0.5 + 0.5 * std::cos(omega * elapsed_time_);
+    static double last_print_time = 0.0;
+    // now move parameterically between Q1 and Q2
     // q_goal = (1 - alpha) * Q1 + alpha * Q2;
+
+    std_msgs::msg::Float64MultiArray msg;
+    msg.data.resize(7);
+    for (int i = 0; i < 7; ++i)
+    {
+      msg.data[i] = q_goal(i);
+    }
+    this->commanded_pose_pub_->publish(msg);
+
+    msg.data.resize(7);
+    for (int i = 0; i < 7; ++i)
+    {
+      msg.data[i] = q_(i);
+    }
+    this->actual_pose_pub_->publish(msg);
 
     const double kAlpha = 0.99;
     dq_filtered_ = (1 - kAlpha) * dq_filtered_ + kAlpha * dq_;
@@ -168,8 +179,14 @@ namespace franka_handshake_controllers
 
     // Create subscriber for handshake frequency
     freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
-      "franka_handshake_freq", 10,
-      std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
+        "franka_handshake_freq", 10,
+        std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
+
+    this->commanded_pose_pub_ =
+        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/commanded_pose", 10);
+
+    this->actual_pose_pub_ =
+        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/actual_pose", 10);
 
     return CallbackReturn::SUCCESS;
   }
@@ -186,7 +203,7 @@ namespace franka_handshake_controllers
     auto dQ1 = get_node()->get_parameter("dQ1").as_double_array();
     auto dQ2 = get_node()->get_parameter("dQ2").as_double_array();
 
-    for(int i = 0; i < 7; i++)
+    for (int i = 0; i < 7; i++)
     {
       dQ1_(i) = dQ1.at(i);
       dQ2_(i) = dQ2.at(i);
