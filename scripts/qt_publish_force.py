@@ -46,7 +46,7 @@ class HandshakeForcePublisher(Node):
         msg = EntityWrench()
         msg.entity.name = self.entity.name
         msg.entity.type = self.entity.type
-        msg.wrench.force.y = force
+        msg.wrench.force.z = force
         self.pub.publish(msg)
 
 
