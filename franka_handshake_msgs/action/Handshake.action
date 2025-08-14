@@ -1,0 +1,8 @@
+float64 amplitude
+float64 frequency
+int32 n_oscillations
+---
+bool success
+string message
+---
+float64 progress

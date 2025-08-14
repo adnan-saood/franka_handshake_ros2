@@ -15,10 +15,10 @@ class HandshakeForcePublisher(Node):
         self.pub = self.create_publisher(EntityWrench, '/world/empty/wrench', 10)
         
         # Parameters for virtual hand motion
-        self.k = 1000.0   # N/m, stiffness
-        self.b = 10.0     # N*s/m, damping
+        self.k = 500.0   # N/m, stiffness
+        self.b = 0.0     # N*s/m, damping
         self.A = 0.1      # m, amplitude of hand motion
-        self.freq = 0.2  # Hz, handshake frequency
+        self.freq = 0.5  # Hz, handshake frequency
 
         # Box entity
         self.entity = Entity()

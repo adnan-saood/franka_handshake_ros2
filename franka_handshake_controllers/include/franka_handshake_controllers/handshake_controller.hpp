@@ -23,6 +23,9 @@
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 
+#include "franka_handshake_msgs/action/handshake.hpp"
+#include <rclcpp_action/rclcpp_action.hpp>
+
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 namespace franka_handshake_controllers
@@ -44,6 +47,23 @@ class HandShakeController : public controller_interface::ControllerInterface
   CallbackReturn on_init() override;
   CallbackReturn on_configure(const rclcpp_lifecycle::State& previous_state) override;
   CallbackReturn on_activate(const rclcpp_lifecycle::State& previous_state) override;
+
+
+  using Handshake = franka_handshake_msgs::action::Handshake;
+  using GoalHandleHandshake = rclcpp_action::ServerGoalHandle<Handshake>;
+
+  rclcpp_action::Server<Handshake>::SharedPtr handshake_action_server_;
+
+  void handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Handshake::Goal> goal);
+  void handle_cancel(const std::shared_ptr<GoalHandleHandshake> goal_handle);
+  void handle_accepted(const std::shared_ptr<GoalHandleHandshake> goal_handle);
+  void execute(const std::shared_ptr<GoalHandleHandshake> goal_handle);
+  // Store handshake parameters
+  double handshake_amplitude_;
+  double handshake_frequency_;
+  int handshake_n_oscillations_;
+  bool handshake_active_;
+  rclcpp::Time handshake_start_time_;
 
  protected:
   double hs_freq_{0.4};  // handshake frequency (Hz)
