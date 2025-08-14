@@ -1,17 +1,3 @@
-// Copyright (c) 2023 Franka Robotics GmbH
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include <franka_handshake_controllers/handshake_controller.hpp>
 #include <franka_handshake_controllers/robot_utils.hpp>
 #include <std_msgs/msg/float64.hpp>
@@ -20,12 +6,14 @@
 #include <cmath>
 #include <exception>
 #include <string>
+#include <thread>
 
 #include <Eigen/Eigen>
 
 namespace franka_handshake_controllers
 {
-
+  using Handshake = franka_handshake_msgs::action::Handshake;
+  using GoalHandleHandshake = rclcpp_action::ServerGoalHandle<Handshake>;
   void HandShakeController::freq_callback(const std_msgs::msg::Float64::SharedPtr msg)
   {
     hs_freq_ = msg->data;
@@ -104,6 +92,35 @@ namespace franka_handshake_controllers
     for (int i = 0; i < num_joints; ++i)
     {
       command_interfaces_[i].set_value(tau_d_calculated(i));
+    }
+
+    if (handshake_active_)
+    {
+      if (handshake_start_time_ == 0.0)
+      {
+        handshake_start_time_ = elapsed_time_;
+      }
+      double elapsed = elapsed_time_ - handshake_start_time_;
+      double duration = (double)handshake_n_oscillations_ / handshake_frequency_;
+      double progress = elapsed / duration;
+
+      RCLCPP_INFO(get_node()->get_logger(),
+       "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
+
+      auto feedback = std::make_shared<Handshake::Feedback>();
+      feedback->progress = progress;
+      active_goal_handle_->publish_feedback(feedback);
+
+      if (elapsed >= duration)
+      {
+        auto result = std::make_shared<Handshake::Result>();
+        result->success = true;
+        result->message = "Handshake complete";
+        active_goal_handle_->succeed(result);
+        handshake_active_ = false;
+        handshake_start_time_ = 0.0;
+        active_goal_handle_.reset();
+      }
     }
     return controller_interface::return_type::OK;
   }
@@ -188,6 +205,16 @@ namespace franka_handshake_controllers
     this->actual_pose_pub_ =
         get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/actual_pose", 10);
 
+    handshake_action_server_ = rclcpp_action::create_server<Handshake>(
+        get_node()->get_node_base_interface(),
+        get_node()->get_node_clock_interface(),
+        get_node()->get_node_logging_interface(),
+        get_node()->get_node_waitables_interface(),
+        "handshake",
+        std::bind(&HandShakeController::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&HandShakeController::handle_cancel, this, std::placeholders::_1),
+        std::bind(&HandShakeController::handle_accepted, this, std::placeholders::_1));
+
     return CallbackReturn::SUCCESS;
   }
 
@@ -225,6 +252,36 @@ namespace franka_handshake_controllers
       q_(i) = position_interface.get_value();
       dq_(i) = velocity_interface.get_value();
     }
+  }
+
+  using namespace std::chrono_literals;
+
+  rclcpp_action::GoalResponse HandShakeController::handle_goal(
+      const rclcpp_action::GoalUUID &,
+      std::shared_ptr<const franka_handshake_msgs::action::Handshake::Goal> /*goal*/)
+  {
+    RCLCPP_INFO(get_node()->get_logger(), "Received handshake goal");
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  rclcpp_action::CancelResponse HandShakeController::handle_cancel(
+      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> /*goal_handle*/)
+  {
+    RCLCPP_INFO(get_node()->get_logger(), "Handshake goal canceled");
+    handshake_active_ = false;
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  void HandShakeController::handle_accepted(
+      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> goal_handle)
+  {
+    RCLCPP_INFO(get_node()->get_logger(), "Handshake goal accepted");
+    handshake_active_ = true;
+    active_goal_handle_ = goal_handle;
+    this->handshake_amplitude_ = goal_handle->get_goal()->amplitude;
+    this->handshake_frequency_ = goal_handle->get_goal()->frequency;
+    this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
+    
   }
 
 } // namespace franka_example_controllers

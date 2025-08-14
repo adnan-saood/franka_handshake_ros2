@@ -54,16 +54,23 @@ class HandShakeController : public controller_interface::ControllerInterface
 
   rclcpp_action::Server<Handshake>::SharedPtr handshake_action_server_;
 
-  void handle_goal(const rclcpp_action::GoalUUID & uuid, std::shared_ptr<const Handshake::Goal> goal);
-  void handle_cancel(const std::shared_ptr<GoalHandleHandshake> goal_handle);
-  void handle_accepted(const std::shared_ptr<GoalHandleHandshake> goal_handle);
-  void execute(const std::shared_ptr<GoalHandleHandshake> goal_handle);
+  rclcpp_action::GoalResponse handle_goal(
+      const rclcpp_action::GoalUUID & uuid,
+      std::shared_ptr<const franka_handshake_msgs::action::Handshake::Goal> goal);
+
+  rclcpp_action::CancelResponse handle_cancel(
+      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> goal_handle);
+
+  void handle_accepted(
+      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> goal_handle);
+
   // Store handshake parameters
   double handshake_amplitude_;
   double handshake_frequency_;
-  int handshake_n_oscillations_;
+  double handshake_n_oscillations_;
   bool handshake_active_;
-  rclcpp::Time handshake_start_time_;
+  double handshake_start_time_{0.0};
+  std::shared_ptr<GoalHandleHandshake> active_goal_handle_;
 
  protected:
   double hs_freq_{0.4};  // handshake frequency (Hz)
@@ -71,6 +78,9 @@ class HandShakeController : public controller_interface::ControllerInterface
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr commanded_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr actual_pose_pub_;
   void freq_callback(const std_msgs::msg::Float64::SharedPtr msg);
+
+
+
 
  private:
   std::string arm_id_;
