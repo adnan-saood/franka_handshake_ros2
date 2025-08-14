@@ -94,34 +94,8 @@ namespace franka_handshake_controllers
       command_interfaces_[i].set_value(tau_d_calculated(i));
     }
 
-    if (handshake_active_)
-    {
-      if (handshake_start_time_ == 0.0)
-      {
-        handshake_start_time_ = elapsed_time_;
-      }
-      double elapsed = elapsed_time_ - handshake_start_time_;
-      double duration = (double)handshake_n_oscillations_ / handshake_frequency_;
-      double progress = elapsed / duration;
+    handle_action_server_progress(elapsed_time_);
 
-      RCLCPP_INFO(get_node()->get_logger(),
-       "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
-
-      auto feedback = std::make_shared<Handshake::Feedback>();
-      feedback->progress = progress;
-      active_goal_handle_->publish_feedback(feedback);
-
-      if (elapsed >= duration)
-      {
-        auto result = std::make_shared<Handshake::Result>();
-        result->success = true;
-        result->message = "Handshake complete";
-        active_goal_handle_->succeed(result);
-        handshake_active_ = false;
-        handshake_start_time_ = 0.0;
-        active_goal_handle_.reset();
-      }
-    }
     return controller_interface::return_type::OK;
   }
 
@@ -281,7 +255,39 @@ namespace franka_handshake_controllers
     this->handshake_amplitude_ = goal_handle->get_goal()->amplitude;
     this->handshake_frequency_ = goal_handle->get_goal()->frequency;
     this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
-    
+
+  }
+
+  void HandShakeController::handle_action_server_progress(double elapsed_time)
+  {
+    if (handshake_active_)
+    {
+      if (handshake_start_time_ == 0.0)
+      {
+        handshake_start_time_ = elapsed_time_;
+      }
+      double elapsed = elapsed_time_ - handshake_start_time_;
+      double duration = (double)handshake_n_oscillations_ / handshake_frequency_;
+      double progress = elapsed / duration;
+
+      RCLCPP_INFO(get_node()->get_logger(),
+       "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
+
+      auto feedback = std::make_shared<Handshake::Feedback>();
+      feedback->progress = progress;
+      active_goal_handle_->publish_feedback(feedback);
+
+      if (elapsed >= duration)
+      {
+        auto result = std::make_shared<Handshake::Result>();
+        result->success = true;
+        result->message = "Handshake complete";
+        active_goal_handle_->succeed(result);
+        handshake_active_ = false;
+        handshake_start_time_ = 0.0;
+        active_goal_handle_.reset();
+      }
+    }
   }
 
 } // namespace franka_example_controllers
