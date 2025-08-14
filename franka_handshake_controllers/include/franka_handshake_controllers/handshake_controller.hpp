@@ -81,8 +81,8 @@ class HandShakeController : public controller_interface::ControllerInterface
 
   void handle_action_server_progress(double elapsed_time);
 
-
-
+  void publish_commanded_pose(const Vector7d &q_goal);
+  void publish_actual_pose(const Vector7d &q_actual);
 
  private:
   std::string arm_id_;

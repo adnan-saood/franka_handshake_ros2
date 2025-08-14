@@ -52,38 +52,26 @@ namespace franka_handshake_controllers
   {
     updateJointStates();
     Vector7d q_goal = initial_q_;
-
-    Vector7d QS = initial_q_;
-    Vector7d Q1 = initial_q_;
-    Vector7d Q2 = initial_q_;
-
-    // add dQ_ to Q
-    Q1 += dQ1_;
-    Q2 += dQ2_;
-
     elapsed_time_ = elapsed_time_ + period.seconds();
 
-    // Use hs_freq_ for cosine frequency
-    double omega = 2 * M_PI * hs_freq_;
-    double alpha = 0.5 + 0.5 * std::cos(omega * elapsed_time_);
-    static double last_print_time = 0.0;
-    // now move parameterically between Q1 and Q2
-    // q_goal = (1 - alpha) * Q1 + alpha * Q2;
-
-    std_msgs::msg::Float64MultiArray msg;
-    msg.data.resize(7);
-    for (int i = 0; i < 7; ++i)
+    if (this->handshake_active_)
     {
-      msg.data[i] = q_goal(i);
-    }
-    this->commanded_pose_pub_->publish(msg);
+      double handshake_start_time = elapsed_time_;
+      Vector7d QS = initial_q_;
+      Vector7d Q1 = initial_q_;
+      Vector7d Q2 = initial_q_;
 
-    msg.data.resize(7);
-    for (int i = 0; i < 7; ++i)
-    {
-      msg.data[i] = q_(i);
+      Q1 += dQ1_; // upper point
+      Q2 += dQ2_; // lower point
+
+
+      // Use hs_freq_ for cosine frequency
+      double omega = 2 * M_PI * hs_freq_;
+      double alpha = 0.5 + 0.5 * std::cos((omega * elapsed_time_ - handshake_start_time) - M_PI_2);
+      static double last_print_time = 0.0;
+      // now move parameterically between Q1 and Q2
+      // q_goal = (1 - alpha) * Q1 + alpha * Q2;
     }
-    this->actual_pose_pub_->publish(msg);
 
     const double kAlpha = 0.99;
     dq_filtered_ = (1 - kAlpha) * dq_filtered_ + kAlpha * dq_;
@@ -255,7 +243,6 @@ namespace franka_handshake_controllers
     this->handshake_amplitude_ = goal_handle->get_goal()->amplitude;
     this->handshake_frequency_ = goal_handle->get_goal()->frequency;
     this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
-
   }
 
   void HandShakeController::handle_action_server_progress(double elapsed_time)
@@ -271,7 +258,7 @@ namespace franka_handshake_controllers
       double progress = elapsed / duration;
 
       RCLCPP_INFO(get_node()->get_logger(),
-       "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
+                  "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
 
       auto feedback = std::make_shared<Handshake::Feedback>();
       feedback->progress = progress;
@@ -290,7 +277,29 @@ namespace franka_handshake_controllers
     }
   }
 
-} // namespace franka_example_controllers
+  void HandShakeController::publish_commanded_pose(const Vector7d &q_goal)
+  {
+    std_msgs::msg::Float64MultiArray msg;
+    msg.data.resize(7);
+    for (int i = 0; i < 7; ++i)
+    {
+      msg.data[i] = q_goal(i);
+    }
+    this->commanded_pose_pub_->publish(msg);
+  }
+
+  void HandShakeController::publish_actual_pose(const Vector7d &q_actual)
+  {
+    std_msgs::msg::Float64MultiArray msg;
+    msg.data.resize(7);
+    for (int i = 0; i < 7; ++i)
+    {
+      msg.data[i] = q_actual(i);
+    }
+    this->actual_pose_pub_->publish(msg);
+  }
+
+} // namespace franka_handshake_controllers
 #include "pluginlib/class_list_macros.hpp"
 // NOLINTNEXTLINE
 PLUGINLIB_EXPORT_CLASS(franka_handshake_controllers::HandShakeController,
