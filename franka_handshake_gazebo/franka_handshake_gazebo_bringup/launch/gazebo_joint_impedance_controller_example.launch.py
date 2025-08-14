@@ -160,6 +160,18 @@ def generate_launch_description():
                 'handshake_controller'],
         output='screen'
     )
+    parameter_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='parameter_bridge',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True
+        }],
+        arguments=[
+            '/world/empty/wrench@ros_gz_interfaces/msg/EntityWrench]ignition.msgs.EntityWrench'
+        ]
+    )
 
     return LaunchDescription([
         load_gripper_launch_argument,
@@ -169,8 +181,8 @@ def generate_launch_description():
         gazebo_empty_world,
         robot_state_publisher,
         rviz,
-        wrench_bridge,
         spawn,
+        parameter_bridge,
         RegisterEventHandler(
                 event_handler=OnProcessExit(
                     target_action=spawn,

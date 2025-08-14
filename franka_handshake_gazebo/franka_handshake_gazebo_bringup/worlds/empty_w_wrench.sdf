@@ -68,14 +68,22 @@
                 </visual>
             </link>
         </model>
-
+<!-- 
         <model name="box">
             <link name="box_link">
-                <pose>0 0 0.5 0 0 0</pose>
+                <pose>0 0 0.1 0 0 0</pose>
+                <inertial>
+                    <mass>0.1</mass>
+                    <inertia>
+                        <ixx>0.001</ixx>
+                        <iyy>0.001</iyy>
+                        <izz>0.001</izz>
+                    </inertia>
+                </inertial>
                 <visual name="box_visual">
                     <geometry>
                         <box>
-                            <size>0.5 0.5 0.5</size>
+                            <size>0.1 0.1 0.1</size>
                         </box>
                     </geometry>
                     <material>
@@ -87,12 +95,54 @@
                 <collision name="box_collision">
                     <geometry>
                         <box>
-                            <size>0.5 0.5 0.5</size>
+                            <size>0.1 0.1 0.1</size>
                         </box>
                     </geometry>
                 </collision>
             </link>
-        </model>
+
+            <link name="box_2_linkppppppppppppppp">
+                <pose>1 0 0.1 0 0 0</pose>
+                <inertial>
+                    <mass>0.1</mass>
+                    <inertia>
+                        <ixx>0.001</ixx>
+                        <iyy>0.001</iyy>
+                        <izz>0.001</izz>
+                    </inertia>
+                </inertial>
+                <visual name="box_visual">
+                    <geometry>
+                        <box>
+                            <size>0.1 0.1 0.1</size>
+                        </box>
+                    </geometry>
+                    <material>
+                        <ambient>0.8 0.8 0.8 1</ambient>
+                        <diffuse>0.8 0.8 0.8 1</diffuse>
+                        <specular>0.8 0.8 0.8 1</specular>
+                    </material>
+                </visual>
+                <collision name="box_collision">
+                    <geometry>
+                        <box>
+                            <size>0.1 0.1 0.1</size>
+                        </box>
+                    </geometry>
+                </collision>
+            </link>
+
+
+            <plugin
+                filename="ignition-gazebo-pose-publisher-system"
+                name="gz::sim::systems::PosePublisher">
+                <publish_link_pose>true</publish_link_pose>
+                <publish_collision_pose>false</publish_collision_pose>
+                <use_pose_vector_msg>true</use_pose_vector_msg>
+                <publish_visual_pose>false</publish_visual_pose>
+                <publish_nested_model_pose>false</publish_nested_model_pose>
+            </plugin>
+        </model> -->
 
 
         <system name="gz::sim::systems::ApplyLinkWrench" plugin="gz-sim-apply-link-wrench-system">
