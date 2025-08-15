@@ -65,13 +65,55 @@ namespace franka_handshake_controllers
       Q1 += dQ1_; // lower point
       Q2 += dQ2_; // upper point
 
-      // Use handshake_tuning_ for cosine frequency
-      double omega = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
-      double t = elapsed_time_ - handshake_start_time_;
-      double alpha = 0.5 + 0.5 * std::sin(omega * t);
+      // Frequency and period definitions
+      double omega = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_); // rad/s for full oscillation
+      double T_half = M_PI / omega;                                                // half-period duration
+      int k_total = handshake_half_oscillations_;                                  // total number of half-oscillations
+      double T_total = k_total * T_half;                                           // total handshake time
 
-      // now move parameterically between Q1 and Q2
-      q_goal = (1 - alpha) * Q2 + alpha * Q1;
+      // Elapsed time since handshake start
+      double t_now = elapsed_time_ - handshake_start_time_;
+      if (t_now > T_total)
+        t_now = T_total; // clamp at end
+
+      // Minimum jerk ramp function
+      auto min_jerk = [](double tau)
+      {
+        return 10 * tau * tau * tau - 15 * tau * tau * tau * tau + 6 * tau * tau * tau * tau * tau;
+      };
+
+      // Envelope E(t)
+      double E = 1.0;
+      if (t_now < T_half)
+      {
+        double tau = t_now / T_half;
+        E = min_jerk(tau);
+      }
+      else if (t_now > (T_total - T_half))
+      {
+        double tau = (T_total - t_now) / T_half;
+        if (tau < 0.0)
+          tau = 0.0;
+        E = min_jerk(tau);
+      }
+
+      // Integrate phase incrementally
+      static double phi = M_PI / 2.0; // start at midpoint
+      static double last_t = t_now;
+      if (t_now < last_t)
+      {
+        // reset if handshake restarted
+        phi = M_PI / 2.0;
+      }
+      double dt = t_now - last_t;
+      phi += omega * E * dt;
+      last_t = t_now;
+
+      // Compute alpha from phase
+      double alpha = 0.5 * (1.0 - std::cos(phi));
+
+      // Interpolate between Q1 and Q2
+      q_goal = (1.0 - alpha) * Q1 + alpha * Q2;
     }
     publish_commanded_pose(q_goal);
     publish_actual_pose(q_);
