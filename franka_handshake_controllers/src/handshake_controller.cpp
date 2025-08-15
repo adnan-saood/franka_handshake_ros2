@@ -56,7 +56,6 @@ namespace franka_handshake_controllers
 
     if (this->handshake_active_)
     {
-      double handshake_start_time = elapsed_time_;
       Vector7d QS = initial_q_;
       Vector7d Q1 = initial_q_;
       Vector7d Q2 = initial_q_;
@@ -64,13 +63,12 @@ namespace franka_handshake_controllers
       Q1 += dQ1_; // upper point
       Q2 += dQ2_; // lower point
 
-
       // Use hs_freq_ for cosine frequency
       double omega = 2 * M_PI * hs_freq_;
-      double alpha = 0.5 + 0.5 * std::cos((omega * elapsed_time_ - handshake_start_time) - M_PI_2);
+      double alpha = 0.5 + 0.5 * std::sin(omega * (elapsed_time_ - handshake_start_time_));
       static double last_print_time = 0.0;
       // now move parameterically between Q1 and Q2
-      // q_goal = (1 - alpha) * Q1 + alpha * Q2;
+      q_goal = (1 - alpha) * Q1 + alpha * Q2;
     }
 
     const double kAlpha = 0.99;
@@ -254,11 +252,10 @@ namespace franka_handshake_controllers
         handshake_start_time_ = elapsed_time_;
       }
       double elapsed = elapsed_time_ - handshake_start_time_;
-      double duration = (double)handshake_n_oscillations_ / handshake_frequency_;
-      double progress = elapsed / duration;
 
-      RCLCPP_INFO(get_node()->get_logger(),
-                  "Elapsed: %.2f, Progress: %.2f, Duration: %.2f", elapsed, progress, duration);
+      // we divide by two because number of oscillations in handshake context is one up or down movement
+      double duration = (double)handshake_n_oscillations_ / handshake_frequency_ / 2.0; 
+      double progress = elapsed / duration;
 
       auto feedback = std::make_shared<Handshake::Feedback>();
       feedback->progress = progress;
