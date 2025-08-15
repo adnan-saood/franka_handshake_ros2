@@ -1,7 +1,7 @@
 joint1:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -9,8 +9,8 @@ joint1:
 
 joint2:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -18,8 +18,8 @@ joint2:
 
 joint3:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -27,8 +27,8 @@ joint3:
 
 joint4:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -36,8 +36,8 @@ joint4:
 
 joint5:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -45,8 +45,8 @@ joint5:
 
 joint6:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0
@@ -54,8 +54,8 @@ joint6:
 
 joint7:
   dynamic:
-    D: 1  
-    K: 7000 
+    D: 1
+    K: 7000
     damping: 0.003
     friction: 0.2
     mu_coulomb: 0

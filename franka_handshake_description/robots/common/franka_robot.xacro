@@ -28,7 +28,7 @@
                       arm_prefix:=''
                       description_pkg:='franka_description'
                       connected_to:='base'">
-                      
+
     <xacro:include filename="$(find franka_description)/robots/common/utils.xacro" />
 
     <xacro:include filename="$(find franka_description)/robots/common/franka_arm.xacro" />

@@ -49,7 +49,7 @@
 # To see the difference you can run the following command:
 #   ros2 topic list | grep joint_states
 #   ros2 service list | grep controller_manager
-# This becomes usefull for example when you require multiple Franka robots doing
+# This becomes useful for example when you require multiple Franka robots doing
 # possibly different but related tasks. So, you might have the "PICK" and "PLACE" robots
 # in the same workspace, but they are not supposed to interfere with each other.
 #

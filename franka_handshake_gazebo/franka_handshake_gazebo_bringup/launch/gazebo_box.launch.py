@@ -53,7 +53,7 @@ def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_h
         }
     )
     robot_description = {'robot_description': robot_description_config.toxml()}
-    
+
 
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -89,7 +89,7 @@ def generate_launch_description():
             os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
         launch_arguments={'gz_args': f'{world_file} -r', }.items(),
     )
-    
+
     # ros2 run ros_gz_bridge parameter_bridge /world/empty/wrench/persistent@geometry_msgs/msg/Wrench@ignition.msgs.Wrench
     parameter_bridge = Node(
         package='ros_gz_bridge',

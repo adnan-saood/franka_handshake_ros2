@@ -13,7 +13,7 @@ class HandshakeForcePublisher(Node):
     def __init__(self):
         super().__init__('handshake_force_publisher')
         self.pub = self.create_publisher(EntityWrench, '/world/empty/wrench', 10)
-        
+
         # Parameters for virtual hand motion
         self.k = 500.0   # N/m, stiffness
         self.b = 0.0     # N*s/m, damping
@@ -32,13 +32,13 @@ class HandshakeForcePublisher(Node):
         # TF2 setup
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-        
+
         self.z_link = 0.0  # Initial position of the box
         self.dz_link = 0.0  # Initial velocity of the box
         self.z_hand = 0.0  # Initial position of the virtual hand
         self.dz_hand = 0.0  # Initial velocity of the virtual hand
         self.z_hand_initial = 0.0
-        
+
 
     def init_args(self):
         # try to get initial z_hand as to be matching robot z_link

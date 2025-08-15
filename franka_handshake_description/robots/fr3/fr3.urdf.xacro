@@ -63,7 +63,7 @@
 
   <!-- Name of the description package -->
   <xacro:arg name="description_pkg" default="franka_description" />
-  
+
   <!-- Append an underscore to the user-provided prefix, if non-empty. -->
   <xacro:property name="prefix" value="$(arg arm_prefix)"/>
   <xacro:property name="modified_prefix" value="${prefix + '_' if prefix else ''}"/>

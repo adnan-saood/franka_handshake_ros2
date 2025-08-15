@@ -53,7 +53,7 @@ def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_h
         }
     )
     robot_description = {'robot_description': robot_description_config.toxml()}
-    
+
 
     robot_state_publisher = Node(
         package='robot_state_publisher',
@@ -104,7 +104,7 @@ def generate_launch_description():
         default_value='True', # Set default to true for simulation
         description='Use simulation (Gazebo) clock if true'
     )
-    
+
     # Get robot description
     robot_state_publisher = OpaqueFunction(
         function=get_robot_description,
@@ -168,7 +168,7 @@ def generate_launch_description():
             '/world/empty/wrench@ros_gz_interfaces/msg/EntityWrench]ignition.msgs.EntityWrench',
         ]
     )
-    
+
     clock_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',

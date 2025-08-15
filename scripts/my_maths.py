@@ -128,4 +128,3 @@ plt.show()
 print(f"mode = {mode}, k_total (half-oscillations) = {k_total}, f = {f} Hz")
 print(f"T_half = {T_half:.4f} s, T_total = {T_total:.4f} s, omega = {omega:.4f} rad/s")
 print(f"phi start = {phi[0]:.4f} rad, phi end target = {phi_end_target:.4f} rad, phi end actual = {phi[-1]:.4f} rad")
-

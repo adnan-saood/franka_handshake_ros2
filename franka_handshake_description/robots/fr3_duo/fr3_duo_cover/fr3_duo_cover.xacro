@@ -3,7 +3,7 @@
 
   <xacro:include filename="$(find franka_description)/robots/common/utils.xacro" />
 
-  <xacro:macro name="cover" params="name parent inertials *origin">   
+  <xacro:macro name="cover" params="name parent inertials *origin">
     <link name="cover_link" >
       <visual>
         <geometry>

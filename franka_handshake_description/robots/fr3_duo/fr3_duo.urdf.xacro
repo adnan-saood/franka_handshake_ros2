@@ -13,7 +13,7 @@
   <!-- Define arguments -->
   <xacro:arg name="arm_ids" default="['fr3v2','fr3v2']" />
   <xacro:property name="arm_ids_list" value="${$(arg arm_ids)}" />
-  
+
   <!-- Don't print a prefix for joints, visuals, and links? -->
   <xacro:arg name="no_prefix" default="false"/>
 
@@ -80,7 +80,7 @@
   </xacro:cover>
 
   <xacro:property name="number_of_robots" value = "2"/>
-  <xacro:property name="arm_prefixes_list" value="${['left','right']}" /> 
+  <xacro:property name="arm_prefixes_list" value="${['left','right']}" />
   <xacro:macro name="loop" params="i">
     <xacro:unless value="${i == number_of_robots}">
 

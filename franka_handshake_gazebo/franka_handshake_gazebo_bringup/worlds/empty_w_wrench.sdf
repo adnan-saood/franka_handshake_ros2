@@ -69,7 +69,7 @@
             </link>
         </model>
 
-<!-- 
+<!--
         <model name="box">
             <link name="box_link">
                 <pose>0 0 0.1 0 0 0</pose>
