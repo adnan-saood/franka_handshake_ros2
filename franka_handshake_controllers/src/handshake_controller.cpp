@@ -54,21 +54,24 @@ namespace franka_handshake_controllers
     Vector7d q_goal = initial_q_;
     elapsed_time_ = elapsed_time_ + period.seconds();
 
+    handle_action_server_progress(elapsed_time_);
+
     if (this->handshake_active_)
     {
       Vector7d QS = initial_q_;
       Vector7d Q1 = initial_q_;
       Vector7d Q2 = initial_q_;
 
-      Q1 += dQ1_; // upper point
-      Q2 += dQ2_; // lower point
+      Q1 += dQ1_; // lower point
+      Q2 += dQ2_; // upper point
 
       // Use handshake_tuning_ for cosine frequency
-      double omega = 2 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
-      double alpha = 0.5 + 0.5 * std::sin(omega * (elapsed_time_ - handshake_start_time_));
+      double omega = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
+      double t = elapsed_time_ - handshake_start_time_;
+      double alpha = 0.5 + 0.5 * std::sin(omega * t);
 
       // now move parameterically between Q1 and Q2
-      q_goal = (1 - alpha) * Q1 + alpha * Q2;
+      q_goal = (1 - alpha) * Q2 + alpha * Q1;
     }
     publish_commanded_pose(q_goal);
     publish_actual_pose(q_);
@@ -81,8 +84,6 @@ namespace franka_handshake_controllers
     {
       command_interfaces_[i].set_value(tau_d_calculated(i));
     }
-
-    handle_action_server_progress(elapsed_time_);
 
     return controller_interface::return_type::OK;
   }
@@ -255,7 +256,7 @@ namespace franka_handshake_controllers
       double elapsed = elapsed_time_ - handshake_start_time_;
 
       // we divide by two because number of oscillations in handshake context is one up or down movement
-      double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0; 
+      double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0;
       double progress = elapsed / duration;
 
       auto feedback = std::make_shared<Handshake::Feedback>();

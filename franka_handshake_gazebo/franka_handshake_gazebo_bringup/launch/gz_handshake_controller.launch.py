@@ -30,7 +30,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import  LaunchConfiguration
 from launch_ros.actions import Node
 
-def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_hand):
+def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_hand, use_sim_time):
     arm_id_str = context.perform_substitution(arm_id)
     load_gripper_str = context.perform_substitution(load_gripper)
     franka_hand_str = context.perform_substitution(franka_hand)
@@ -62,6 +62,7 @@ def get_robot_description(context: LaunchContext, arm_id, load_gripper, franka_h
         output='both',
         parameters=[
             robot_description,
+            {'use_sim_time': use_sim_time}
         ]
     )
 
@@ -80,6 +81,7 @@ def generate_launch_description():
     franka_hand = LaunchConfiguration(franka_hand_name)
     arm_id = LaunchConfiguration(arm_id_name)
     namespace = LaunchConfiguration(namespace_name)
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
     load_gripper_launch_argument = DeclareLaunchArgument(
             load_gripper_name,
@@ -97,11 +99,16 @@ def generate_launch_description():
         namespace_name,
         default_value='',
         description='Namespace for the robot. If not set, the robot will be launched in the root namespace.')
-
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='True', # Set default to true for simulation
+        description='Use simulation (Gazebo) clock if true'
+    )
+    
     # Get robot description
     robot_state_publisher = OpaqueFunction(
         function=get_robot_description,
-        args=[arm_id, load_gripper, franka_hand])
+        args=[arm_id, load_gripper, franka_hand, use_sim_time])
 
     # Gazebo Sim
     os.environ['GZ_SIM_RESOURCE_PATH'] = os.path.dirname(get_package_share_directory('franka_handshake_description'))
@@ -124,19 +131,7 @@ def generate_launch_description():
         namespace=namespace,
         arguments=['-topic', '/robot_description', '--name', 'fr3'],
         output='screen',
-    )
-    
-    wrench_bridge = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        name='wrench_bridge',
-        arguments=[
-            '/external_handshake_wrench@geometry_msgs/msg/WrenchStamped@gz.msgs.Wrench'
-        ],
-        remappings=[
-            # This remapping is crucial. Model name assumed to be 'fr3'.
-            ('/external_handshake_wrench', '/model/fr3/link/ext_force/wrench')
-        ]
+        parameters=[{'use_sim_time': use_sim_time}],
     )
 
     # Visualize in RViz
@@ -147,6 +142,7 @@ def generate_launch_description():
              name='rviz2',
              namespace=namespace,
              arguments=['--display-config', rviz_file, '-f', 'world'],
+            parameters=[{'use_sim_time': use_sim_time}],
     )
 
     load_joint_state_broadcaster = ExecuteProcess(
@@ -166,11 +162,22 @@ def generate_launch_description():
         name='parameter_bridge',
         output='screen',
         parameters=[{
-            'use_sim_time': True
+            'use_sim_time': use_sim_time
         }],
         arguments=[
             '/world/empty/wrench@ros_gz_interfaces/msg/EntityWrench]ignition.msgs.EntityWrench',
         ]
+    )
+    
+    clock_bridge = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='clock_bridge',
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim_time
+        }],
+        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock']
     )
 
     return LaunchDescription([
@@ -178,9 +185,11 @@ def generate_launch_description():
         franka_hand_launch_argument,
         arm_id_launch_argument,
         namespace_launch_argument,
+        use_sim_time_arg,
         gazebo_empty_world,
         robot_state_publisher,
-        rviz,
+        # rviz,
+        clock_bridge,
         spawn,
         parameter_bridge,
         RegisterEventHandler(
@@ -202,6 +211,7 @@ def generate_launch_description():
             namespace=namespace,
             parameters=[
                 {'source_list': ['joint_states'],
-                 'rate': 30}],
+                 'rate': 30},
+                {'use_sim_time': use_sim_time}],
         ),
     ])

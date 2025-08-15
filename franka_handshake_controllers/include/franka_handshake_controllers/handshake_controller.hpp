@@ -73,7 +73,7 @@ class HandShakeController : public controller_interface::ControllerInterface
   std::shared_ptr<GoalHandleHandshake> active_goal_handle_;
 
  protected:
-  double handshake_tuning_{0.4};  // handshake frequency (Hz)
+  double handshake_tuning_{0.0};  // handshake frequency (Hz)
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr freq_sub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr commanded_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr actual_pose_pub_;
