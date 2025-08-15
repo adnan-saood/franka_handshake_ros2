@@ -1,19 +1,18 @@
 #include <franka_handshake_controllers/handshake_controller.hpp>
 #include <franka_handshake_controllers/robot_utils.hpp>
 #include <std_msgs/msg/float64.hpp>
-
 #include <cassert>
 #include <cmath>
 #include <exception>
 #include <string>
 #include <thread>
-
 #include <Eigen/Eigen>
 
 namespace franka_handshake_controllers
 {
   using Handshake = franka_handshake_msgs::action::Handshake;
   using GoalHandleHandshake = rclcpp_action::ServerGoalHandle<Handshake>;
+
   void HandShakeController::freq_callback(const std_msgs::msg::Float64::SharedPtr msg)
   {
     handshake_tuning_ = msg->data;
@@ -25,7 +24,6 @@ namespace franka_handshake_controllers
   {
     controller_interface::InterfaceConfiguration config;
     config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
-
     for (int i = 1; i <= num_joints; ++i)
     {
       config.names.push_back(arm_id_ + "_joint" + std::to_string(i) + "/effort");
@@ -50,7 +48,13 @@ namespace franka_handshake_controllers
       const rclcpp::Time & /*time*/,
       const rclcpp::Duration &period)
   {
-    updateJointStates();
+    try {
+      updateJointStates();
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(get_node()->get_logger(), "Exception in updateJointStates: %s", e.what());
+      return controller_interface::return_type::ERROR;
+    }
+
     Vector7d q_goal = initial_q_;
     elapsed_time_ = elapsed_time_ + period.seconds();
 
@@ -66,19 +70,25 @@ namespace franka_handshake_controllers
       Q2 += dQ2_; // upper point
 
       // Frequency and period definitions
-      double omega = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_); // rad/s for full oscillation
-      double T_half = M_PI / omega;                                                // half-period duration
-      int k_total = handshake_half_oscillations_;                                  // total number of half-oscillations
-      double T_total = k_total * T_half;                                           // total handshake time
+      double omega = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
+      if (omega <= 0.0) {
+        RCLCPP_WARN(get_node()->get_logger(), "Omega is non-positive, skipping handshake trajectory.");
+        publish_commanded_pose(q_goal);
+        publish_actual_pose(q_);
+        return controller_interface::return_type::OK;
+      }
+      double T_half = M_PI / omega;
+      int k_total = this->handshake_n_oscillations_;
+      double T_total = k_total * T_half;
 
       // Elapsed time since handshake start
       double t_now = elapsed_time_ - handshake_start_time_;
-      if (t_now > T_total)
-        t_now = T_total; // clamp at end
+      t_now = std::clamp(t_now, 0.0, T_total);
 
       // Minimum jerk ramp function
       auto min_jerk = [](double tau)
       {
+        tau = std::clamp(tau, 0.0, 1.0);
         return 10 * tau * tau * tau - 15 * tau * tau * tau * tau + 6 * tau * tau * tau * tau * tau;
       };
 
@@ -92,29 +102,32 @@ namespace franka_handshake_controllers
       else if (t_now > (T_total - T_half))
       {
         double tau = (T_total - t_now) / T_half;
-        if (tau < 0.0)
-          tau = 0.0;
         E = min_jerk(tau);
       }
 
       // Integrate phase incrementally
-      static double phi = M_PI / 2.0; // start at midpoint
+      static double phi = M_PI / 2.0;
       static double last_t = t_now;
       if (t_now < last_t)
       {
-        // reset if handshake restarted
         phi = M_PI / 2.0;
       }
       double dt = t_now - last_t;
       phi += omega * E * dt;
       last_t = t_now;
 
+      // Clamp phi to [0, 2*pi] for safety
+      if (phi < 0.0) phi = 0.0;
+      if (phi > 2.0 * M_PI) phi = std::fmod(phi, 2.0 * M_PI);
+
       // Compute alpha from phase
       double alpha = 0.5 * (1.0 - std::cos(phi));
+      alpha = std::clamp(alpha, 0.0, 1.0);
 
       // Interpolate between Q1 and Q2
       q_goal = (1.0 - alpha) * Q1 + alpha * Q2;
     }
+
     publish_commanded_pose(q_goal);
     publish_actual_pose(q_);
 
@@ -149,97 +162,108 @@ namespace franka_handshake_controllers
   CallbackReturn HandShakeController::on_configure(
       const rclcpp_lifecycle::State & /*previous_state*/)
   {
-    arm_id_ = get_node()->get_parameter("arm_id").as_string();
-    auto k_gains = get_node()->get_parameter("k_gains").as_double_array();
-    auto d_gains = get_node()->get_parameter("d_gains").as_double_array();
-    if (k_gains.empty())
-    {
-      RCLCPP_FATAL(get_node()->get_logger(), "k_gains parameter not set");
+    try {
+      arm_id_ = get_node()->get_parameter("arm_id").as_string();
+      auto k_gains = get_node()->get_parameter("k_gains").as_double_array();
+      auto d_gains = get_node()->get_parameter("d_gains").as_double_array();
+      if (k_gains.empty())
+      {
+        RCLCPP_FATAL(get_node()->get_logger(), "k_gains parameter not set");
+        return CallbackReturn::FAILURE;
+      }
+      if (k_gains.size() != static_cast<uint>(num_joints))
+      {
+        RCLCPP_FATAL(get_node()->get_logger(), "k_gains should be of size %d but is of size %ld",
+                     num_joints, k_gains.size());
+        return CallbackReturn::FAILURE;
+      }
+      if (d_gains.empty())
+      {
+        RCLCPP_FATAL(get_node()->get_logger(), "d_gains parameter not set");
+        return CallbackReturn::FAILURE;
+      }
+      if (d_gains.size() != static_cast<uint>(num_joints))
+      {
+        RCLCPP_FATAL(get_node()->get_logger(), "d_gains should be of size %d but is of size %ld",
+                     num_joints, d_gains.size());
+        return CallbackReturn::FAILURE;
+      }
+      for (int i = 0; i < num_joints; ++i)
+      {
+        d_gains_(i) = d_gains.at(i);
+        k_gains_(i) = k_gains.at(i);
+      }
+      dq_filtered_.setZero();
+
+      auto parameters_client =
+          std::make_shared<rclcpp::AsyncParametersClient>(get_node(), "robot_state_publisher");
+      parameters_client->wait_for_service();
+
+      auto future = parameters_client->get_parameters({"robot_description"});
+      auto result = future.get();
+      if (!result.empty())
+      {
+        robot_description_ = result[0].value_to_string();
+      }
+      else
+      {
+        RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
+      }
+
+      arm_id_ = "fr3";
+
+      freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
+          "franka_handshake_tuning_freq", 10,
+          std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
+
+      this->commanded_pose_pub_ =
+          get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/commanded_pose", 10);
+
+      this->actual_pose_pub_ =
+          get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/actual_pose", 10);
+
+      handshake_action_server_ = rclcpp_action::create_server<Handshake>(
+          get_node()->get_node_base_interface(),
+          get_node()->get_node_clock_interface(),
+          get_node()->get_node_logging_interface(),
+          get_node()->get_node_waitables_interface(),
+          "handshake",
+          std::bind(&HandShakeController::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
+          std::bind(&HandShakeController::handle_cancel, this, std::placeholders::_1),
+          std::bind(&HandShakeController::handle_accepted, this, std::placeholders::_1));
+    } catch (const std::exception& e) {
+      RCLCPP_FATAL(get_node()->get_logger(), "Exception in on_configure: %s", e.what());
       return CallbackReturn::FAILURE;
     }
-    if (k_gains.size() != static_cast<uint>(num_joints))
-    {
-      RCLCPP_FATAL(get_node()->get_logger(), "k_gains should be of size %d but is of size %ld",
-                   num_joints, k_gains.size());
-      return CallbackReturn::FAILURE;
-    }
-    if (d_gains.empty())
-    {
-      RCLCPP_FATAL(get_node()->get_logger(), "d_gains parameter not set");
-      return CallbackReturn::FAILURE;
-    }
-    if (d_gains.size() != static_cast<uint>(num_joints))
-    {
-      RCLCPP_FATAL(get_node()->get_logger(), "d_gains should be of size %d but is of size %ld",
-                   num_joints, d_gains.size());
-      return CallbackReturn::FAILURE;
-    }
-    for (int i = 0; i < num_joints; ++i)
-    {
-      d_gains_(i) = d_gains.at(i);
-      k_gains_(i) = k_gains.at(i);
-    }
-    dq_filtered_.setZero();
-
-    auto parameters_client =
-        std::make_shared<rclcpp::AsyncParametersClient>(get_node(), "robot_state_publisher");
-    parameters_client->wait_for_service();
-
-    auto future = parameters_client->get_parameters({"robot_description"});
-    auto result = future.get();
-    if (!result.empty())
-    {
-      robot_description_ = result[0].value_to_string();
-    }
-    else
-    {
-      RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
-    }
-
-    arm_id_ = "fr3";
-
-    // Create subscriber for handshake frequency
-    freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
-        "franka_handshake_tuning_freq", 10,
-        std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
-
-    this->commanded_pose_pub_ =
-        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/commanded_pose", 10);
-
-    this->actual_pose_pub_ =
-        get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/actual_pose", 10);
-
-    handshake_action_server_ = rclcpp_action::create_server<Handshake>(
-        get_node()->get_node_base_interface(),
-        get_node()->get_node_clock_interface(),
-        get_node()->get_node_logging_interface(),
-        get_node()->get_node_waitables_interface(),
-        "handshake",
-        std::bind(&HandShakeController::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&HandShakeController::handle_cancel, this, std::placeholders::_1),
-        std::bind(&HandShakeController::handle_accepted, this, std::placeholders::_1));
-
     return CallbackReturn::SUCCESS;
   }
 
   CallbackReturn HandShakeController::on_activate(
       const rclcpp_lifecycle::State & /*previous_state*/)
   {
-    updateJointStates();
-    dq_filtered_.setZero();
-    initial_q_ = q_;
-    elapsed_time_ = 0.0;
+    try {
+      updateJointStates();
+      dq_filtered_.setZero();
+      initial_q_ = q_;
+      elapsed_time_ = 0.0;
 
-    // read from params
-    auto dQ1 = get_node()->get_parameter("dQ1").as_double_array();
-    auto dQ2 = get_node()->get_parameter("dQ2").as_double_array();
+      auto dQ1 = get_node()->get_parameter("dQ1").as_double_array();
+      auto dQ2 = get_node()->get_parameter("dQ2").as_double_array();
 
-    for (int i = 0; i < 7; i++)
-    {
-      dQ1_(i) = dQ1.at(i);
-      dQ2_(i) = dQ2.at(i);
+      if (dQ1.size() != 7 || dQ2.size() != 7) {
+        RCLCPP_FATAL(get_node()->get_logger(), "dQ1 and dQ2 must be size 7");
+        return CallbackReturn::FAILURE;
+      }
+
+      for (int i = 0; i < 7; i++)
+      {
+        dQ1_(i) = dQ1.at(i);
+        dQ2_(i) = dQ2.at(i);
+      }
+    } catch (const std::exception& e) {
+      RCLCPP_FATAL(get_node()->get_logger(), "Exception in on_activate: %s", e.what());
+      return CallbackReturn::FAILURE;
     }
-
     return CallbackReturn::SUCCESS;
   }
 
@@ -297,9 +321,15 @@ namespace franka_handshake_controllers
       }
       double elapsed = elapsed_time_ - handshake_start_time_;
 
-      // we divide by two because number of oscillations in handshake context is one up or down movement
       double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0;
-      double progress = elapsed / duration;
+      if (duration <= 0.0) {
+        RCLCPP_WARN(get_node()->get_logger(), "Handshake duration is non-positive, aborting.");
+        handshake_active_ = false;
+        handshake_start_time_ = 0.0;
+        active_goal_handle_.reset();
+        return;
+      }
+      double progress = std::clamp(elapsed / duration, 0.0, 1.0);
 
       auto feedback = std::make_shared<Handshake::Feedback>();
       feedback->progress = progress;
@@ -341,6 +371,7 @@ namespace franka_handshake_controllers
   }
 
 } // namespace franka_handshake_controllers
+
 #include "pluginlib/class_list_macros.hpp"
 // NOLINTNEXTLINE
 PLUGINLIB_EXPORT_CLASS(franka_handshake_controllers::HandShakeController,
