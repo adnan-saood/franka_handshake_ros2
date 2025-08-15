@@ -16,8 +16,8 @@ namespace franka_handshake_controllers
   using GoalHandleHandshake = rclcpp_action::ServerGoalHandle<Handshake>;
   void HandShakeController::freq_callback(const std_msgs::msg::Float64::SharedPtr msg)
   {
-    hs_freq_ = msg->data;
-    RCLCPP_INFO(get_node()->get_logger(), "Handshake frequency updated to: %f Hz", hs_freq_);
+    handshake_tuning_ = msg->data;
+    RCLCPP_INFO(get_node()->get_logger(), "Handshake tuning frequency updated to: %f Hz", handshake_tuning_);
   }
 
   controller_interface::InterfaceConfiguration
@@ -63,8 +63,8 @@ namespace franka_handshake_controllers
       Q1 += dQ1_; // upper point
       Q2 += dQ2_; // lower point
 
-      // Use hs_freq_ for cosine frequency
-      double omega = 2 * M_PI * handshake_frequency_;
+      // Use handshake_tuning_ for cosine frequency
+      double omega = 2 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
       double alpha = 0.5 + 0.5 * std::sin(omega * (elapsed_time_ - handshake_start_time_));
 
       // now move parameterically between Q1 and Q2
@@ -94,7 +94,6 @@ namespace franka_handshake_controllers
       auto_declare<std::string>("arm_id", "");
       auto_declare<std::vector<double>>("k_gains", {});
       auto_declare<std::vector<double>>("d_gains", {});
-      hs_freq_ = 0.4; // default frequency
     }
     catch (const std::exception &e)
     {
@@ -158,7 +157,7 @@ namespace franka_handshake_controllers
 
     // Create subscriber for handshake frequency
     freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
-        "franka_handshake_freq", 10,
+        "franka_handshake_tuning_freq", 10,
         std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
 
     this->commanded_pose_pub_ =
@@ -241,7 +240,7 @@ namespace franka_handshake_controllers
     handshake_active_ = true;
     active_goal_handle_ = goal_handle;
     this->handshake_amplitude_ = goal_handle->get_goal()->amplitude;
-    this->handshake_frequency_ = goal_handle->get_goal()->frequency;
+    this->handshake_base_frequency_ = goal_handle->get_goal()->frequency;
     this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
   }
 
@@ -256,7 +255,7 @@ namespace franka_handshake_controllers
       double elapsed = elapsed_time_ - handshake_start_time_;
 
       // we divide by two because number of oscillations in handshake context is one up or down movement
-      double duration = (double)handshake_n_oscillations_ / handshake_frequency_ / 2.0; 
+      double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0; 
       double progress = elapsed / duration;
 
       auto feedback = std::make_shared<Handshake::Feedback>();

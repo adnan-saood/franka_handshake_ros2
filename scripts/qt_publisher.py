@@ -20,7 +20,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 # PyQt signals are used to safely communicate from the ROS thread to the GUI thread if needed,
 # though for this simple publisher, we call the ROS node's method directly from the GUI thread.
 
-pub_topic = "/franka_handshake_freq"
+pub_topic = "/franka_handshake_tuning_freq"
 
 freq_range_hz = [0.1, 1.0]  # Min and max frequency in Hz
 

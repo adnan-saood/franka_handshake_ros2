@@ -66,13 +66,14 @@ class HandShakeController : public controller_interface::ControllerInterface
 
   // Store handshake parameters
   double handshake_amplitude_;
-  double handshake_frequency_;
+  double handshake_base_frequency_;
   double handshake_n_oscillations_;
   bool handshake_active_;
   double handshake_start_time_{0.0};
   std::shared_ptr<GoalHandleHandshake> active_goal_handle_;
 
  protected:
+  double handshake_tuning_{0.4};  // handshake frequency (Hz)
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr freq_sub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr commanded_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr actual_pose_pub_;
