@@ -56,9 +56,9 @@ namespace franka_handshake_controllers
     }
 
     Vector7d q_goal = initial_q_;
-    elapsed_time_ = elapsed_time_ + period.seconds();
+    controller_elapsed_time_ = controller_elapsed_time_ + period.seconds();
 
-    handle_action_server_progress(elapsed_time_);
+    handle_action_server_progress(controller_elapsed_time_);
 
     if (this->handshake_active_)
     {
@@ -82,7 +82,7 @@ namespace franka_handshake_controllers
       double T_total = k_total * T_half;
 
       // Elapsed time since handshake start
-      double t_now = elapsed_time_ - handshake_start_time_;
+      double t_now = controller_elapsed_time_ - handshake_start_time_;
       t_now = std::clamp(t_now, 0.0, T_total);
 
       // Minimum jerk ramp function
@@ -245,7 +245,7 @@ namespace franka_handshake_controllers
       updateJointStates();
       dq_filtered_.setZero();
       initial_q_ = q_;
-      elapsed_time_ = 0.0;
+      controller_elapsed_time_ = 0.0;
 
       auto dQ1 = get_node()->get_parameter("dQ1").as_double_array();
       auto dQ2 = get_node()->get_parameter("dQ2").as_double_array();
@@ -317,9 +317,9 @@ namespace franka_handshake_controllers
     {
       if (handshake_start_time_ == 0.0)
       {
-        handshake_start_time_ = elapsed_time_;
+        handshake_start_time_ = elapsed_time;
       }
-      double elapsed = elapsed_time_ - handshake_start_time_;
+      double elapsed = elapsed_time - handshake_start_time_;
 
       double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0;
       if (duration <= 0.0) {

@@ -1,6 +1,7 @@
 float64 amplitude
 float64 frequency
 float64 n_oscillations
+float64 synchrony_factor
 ---
 bool success
 string message

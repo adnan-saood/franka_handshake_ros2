@@ -94,7 +94,7 @@ class HandShakeController : public controller_interface::ControllerInterface
   Vector7d dq_filtered_;
   Vector7d k_gains_;
   Vector7d d_gains_;
-  double elapsed_time_{0.0};
+  double controller_elapsed_time_{0.0};
   void updateJointStates();
 
   Vector7d dQ1_, dQ2_;
