@@ -64,12 +64,14 @@ namespace franka_handshake_controllers
       Q2 += dQ2_; // lower point
 
       // Use hs_freq_ for cosine frequency
-      double omega = 2 * M_PI * hs_freq_;
+      double omega = 2 * M_PI * handshake_frequency_;
       double alpha = 0.5 + 0.5 * std::sin(omega * (elapsed_time_ - handshake_start_time_));
-      static double last_print_time = 0.0;
+
       // now move parameterically between Q1 and Q2
       q_goal = (1 - alpha) * Q1 + alpha * Q2;
     }
+    publish_commanded_pose(q_goal);
+    publish_actual_pose(q_);
 
     const double kAlpha = 0.99;
     dq_filtered_ = (1 - kAlpha) * dq_filtered_ + kAlpha * dq_;

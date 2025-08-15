@@ -169,7 +169,7 @@ def generate_launch_description():
             'use_sim_time': True
         }],
         arguments=[
-            '/world/empty/wrench@ros_gz_interfaces/msg/EntityWrench]ignition.msgs.EntityWrench'
+            '/world/empty/wrench@ros_gz_interfaces/msg/EntityWrench]ignition.msgs.EntityWrench',
         ]
     )
 
