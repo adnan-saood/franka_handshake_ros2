@@ -68,6 +68,7 @@ class HandShakeController : public controller_interface::ControllerInterface
   double handshake_amplitude_;
   double handshake_base_frequency_;
   double handshake_n_oscillations_;
+  double handshake_synchrony_factor_;  // New parameter for synchrony factor
   bool handshake_active_;
   double handshake_start_time_{0.0};
   std::shared_ptr<GoalHandleHandshake> active_goal_handle_;
