@@ -149,9 +149,7 @@ namespace franka_handshake_controllers
 
       // --- Tuning parameters (move to class members if you prefer) ---
       // Gains (these are per-joint effective gains; keep them small enough for safety)
-      const double sync_gain = 0.0; // if you have this member. If not, set here, e.g. 1.0 @adnan-saood edit here
-      // If handshake_sync_ isn't a member, fallback to 1.0:
-      // const double sync_gain = 1.0;
+      const double sync_gain = this->handshake_synchrony_factor_; // if you have this member. If not, set here, e.g. 1.0 @adnan-saood edit here
 
       // NOTE: you can expose these to parameters; here we pick names that match the Python sim.
       const double Kp = 4.0;     // phase adaptation gain (tune this)
@@ -163,7 +161,7 @@ namespace franka_handshake_controllers
       const double lambda_omega = 0.5;           // leak/damping toward nominal omega
       const double omega_min = 2.0 * M_PI * 0.2; // lower bound (rad/s)
       const double omega_max = 2.0 * M_PI * 1.5; // upper bound (rad/s)
-      const double A_min = 1e-3;                 // amplitude lower bound (avoid zero)
+      const double A_min = -2.0;                 // amplitude lower bound (avoid zero)
       const double A_max = 2.0;                  // amplitude upper bound
       const double C_min = -10.0;                // bias bounds (set to safe joint limits)
       const double C_max = 10.0;
