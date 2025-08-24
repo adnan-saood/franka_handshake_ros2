@@ -68,22 +68,13 @@ namespace franka_handshake_controllers
     {
       // --- Setup Q1/Q2 as before (joint offsets from initial_q_) ---
       Vector7d QS = initial_q_;
-      Vector7d Q1 = initial_q_;
-      Vector7d Q2 = initial_q_;
+      Q1_ = initial_q_;
+      Q2_ = initial_q_;
 
-      Q1 += dQ1_; // lower point offsets
-      Q2 += dQ2_; // upper point offsets
+      Q1_ += dQ1_; // lower point offsets
+      Q2_ += dQ2_; // upper point offsets
 
-      // --- Derived scalar timing used by envelope (same as before) ---
-      double omega_base = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
-      if (omega_base <= 0.0)
-      {
-        RCLCPP_WARN(get_node()->get_logger(), "Omega is non-positive, skipping handshake trajectory.");
-        publish_commanded_pose(q_goal);
-        publish_actual_pose(q_);
-        return controller_interface::return_type::OK;
-      }
-      double T_half = M_PI / omega_base;
+      double T_half = M_PI / omega_base_;
       int k_total = this->handshake_n_oscillations_;
       double T_total = static_cast<double>(k_total) * T_half;
 
@@ -111,69 +102,13 @@ namespace franka_handshake_controllers
         E = min_jerk(tau);
       }
 
-      // --- Per-joint adaptive oscillator state (persistent between update calls) ---
-      // NOTE: In a production controller you should move these to class members (initialized in on_configure/on_activate).
-      static bool _adapt_state_initialized = false;
-      static std::array<double, 7> phi;         // phase per joint (rad)
-      static std::array<double, 7> omega;       // angular frequency per joint (rad/s)
-      static std::array<double, 7> A;           // amplitude per joint (rad)
-      static std::array<double, 7> C;           // bias/center per joint (rad)
-      static std::array<double, 7> e_t_filt;    // filtered tangential error per joint
-      static std::array<double, 7> last_q_goal; // previous commanded goal (for potential diagnostics)
+      for (int j = 0; j < num_joints; ++j)
+        RCLCPP_INFO(get_node()->get_logger(),
+                    "Adaptive state %d initialized as: %f, %f, %f, %f, %f, %f, %f",
+                    j, phi_[j], omega_[j], A_[j], C_[j], e_t_filt_[j], last_q_goal_[j]);
 
-      // Initialize on first handshake update
-      if (!_adapt_state_initialized)
-      {
-        for (int j = 0; j < num_joints; ++j)
-        {
-          // initialize phi to start at midpoint (alpha = 0.5)
-          phi[j] = M_PI / 2.0;
-
-          // initialize omega to base nominal (could be per-joint if desired)
-          omega[j] = omega_base;
-
-          // Derive initial amplitude and center from Q1/Q2 so we match interpolation:
-          // q_goal = (1-alpha) Q1 + alpha Q2, with alpha = 0.5(1 - cos phi)
-          // => equivalently q_goal = C - A*cos(phi) with C = 0.5*(Q1+Q2), A = 0.5*(Q2-Q1)
-          C[j] = 0.5 * (Q1[j] + Q2[j]); // midpoint
-          A[j] = 0.5 * (Q2[j] - Q1[j]); // half-range (signed)
-          e_t_filt[j] = 0.0;
-          last_q_goal[j] = C[j] - (E * A[j]) * std::cos(phi[j]);
-          RCLCPP_INFO(get_node()->get_logger(),
-                      "Adaptive state %d initialized as: %f, %f, %f, %f, %f, %f, %f",
-                      j, phi[j], omega[j], A[j], C[j], e_t_filt[j], last_q_goal[j]);
-        }
-        _adapt_state_initialized = true;
-
-      }
-
-      // --- Tuning parameters (move to class members if you prefer) ---
-      // Gains (these are per-joint effective gains; keep them small enough for safety)
-      const double sync_gain = this->handshake_synchrony_factor_; // if you have this member. If not, set here, e.g. 1.0 @adnan-saood edit here
-
-      // NOTE: you can expose these to parameters; here we pick names that match the Python sim.
-      const double Kp = 4.0;     // phase adaptation gain (tune this)
-      const double Komega = 0.8; // frequency adaptation gain (tune this)
-      const double Ka = 1.0;     // amplitude adaptation gain (gradient step)
-      const double Kc = 1.5;     // bias adaptation gain
-
-      // Safety & filtering constants
-      const double lambda_omega = 0.5;           // leak/damping toward nominal omega
-      const double omega_min = 2.0 * M_PI * 0.2; // lower bound (rad/s)
-      const double omega_max = 2.0 * M_PI * 1.5; // upper bound (rad/s)
-      const double A_min = -2.0;                 // amplitude lower bound (avoid zero)
-      const double A_max = 2.0;                  // amplitude upper bound
-      const double C_min = -10.0;                // bias bounds (set to safe joint limits)
-      const double C_max = 10.0;
-      const double eps_b = 1e-6; // small regularizer for tangent normalization
-
-      // low-pass filter constant for tangential error (choose consistent with controller rate)
-      const double tau_e = 0.08; // seconds
       double dt = period.seconds();
       const double alpha_e = dt / (tau_e + dt);
-
-      // nominal omega for damping (use base omega for now)
-      const double omega_nominal = omega_base;
 
       // --- Per-joint adaptation update (vectorized in explicit loop for clarity) ---
       for (int j = 0; j < num_joints; ++j)
@@ -183,13 +118,13 @@ namespace franka_handshake_controllers
 
         // compute per-joint current commanded q_d from current adaptive params:
         // q_d = C - (E * A) * cos(phi)
-        double q_d_j = C[j] - (E * A[j]) * std::cos(phi[j]);
+        double q_d_j = C_[j] - (E * A_[j]) * std::cos(phi_[j]);
 
         // error between actual and commanded (consistent with earlier math: e_q = q_actual - q_d)
         double e_q = q_meas - q_d_j;
 
         // derivative of q_d wrt phi: dq_d/dphi = E * A * sin(phi)
-        double dq_d_dphi = E * A[j] * std::sin(phi[j]);
+        double dq_d_dphi = E * A_[j] * std::sin(phi_[j]);
 
         // --- REFINEMENT: smooth tangent normalization (replace sign() with continuous proxy) ---
         // b = dq_d_dphi / (|dq_d_dphi| + eps)
@@ -199,49 +134,49 @@ namespace franka_handshake_controllers
         double e_t = b * e_q;
 
         // --- REFINEMENT: low-pass filter the tangential error to avoid jitter ---
-        // e_t_filt[j] = (1.0 - alpha_e) * e_t_filt[j] + alpha_e * e_t;
-        e_t_filt[j] =  e_t;
+        // e_t_filt_[j] = (1.0 - alpha_e) * e_t_filt_[j] + alpha_e * e_t;
+        e_t_filt_[j] = e_t;
 
         // --- ADAPTATION LAWS (use filtered e_t) ---
         // effective sync-scaled gain (envelope already applied through E; multiply by sync if available)
         double current_sync_gain = sync_gain * E;
 
         // phase and frequency update (PLL-like with damping on omega)
-        double phi_dot = omega[j] + current_sync_gain * Kp * e_t_filt[j];
-        double omega_dot = current_sync_gain * Komega * e_t_filt[j] - lambda_omega * (omega[j] - omega_nominal);
+        double phi_dot = omega_[j] + current_sync_gain * Kp * e_t_filt_[j];
+        double omega_dot = current_sync_gain * Komega * e_t_filt_[j] - lambda_omega * (omega_[j] - omega_nominal);
 
         // amplitude and center updates (gradient-descent style on squared position error)
-        double A_dot = -current_sync_gain * Ka * e_q * std::cos(phi[j]);
+        double A_dot = -current_sync_gain * Ka * e_q * std::cos(phi_[j]);
         double C_dot = current_sync_gain * Kc * e_q;
 
         // integrate using dt (robust to variable update rate)
-        phi[j] += phi_dot * dt;
-        omega[j] += omega_dot * dt;
-        A[j] += A_dot * dt;
-        C[j] += C_dot * dt;
+        phi_[j] += phi_dot * dt;
+        omega_[j] += omega_dot * dt;
+        A_[j] += A_dot * dt;
+        C_[j] += C_dot * dt;
 
         // --- Saturate / bound safe ranges ---
-        omega[j] = std::clamp(omega[j], omega_min, omega_max);
-        A[j] = std::clamp(A[j], A_min, A_max);
-        C[j] = std::clamp(C[j], C_min, C_max);
+        omega_[j] = std::clamp(omega_[j], omega_min, omega_max);
+        A_[j] = std::clamp(A_[j], A_min, A_max);
+        C_[j] = std::clamp(C_[j], C_min, C_max);
 
         // keep phi numerically bounded (wrap if desired)
-        if (phi[j] > 2.0 * M_PI)
-          phi[j] = std::fmod(phi[j], 2.0 * M_PI);
-        if (phi[j] < 0.0)
-          phi[j] = std::fmod(phi[j], 2.0 * M_PI);
+        if (phi_[j] > 2.0 * M_PI)
+          phi_[j] = std::fmod(phi_[j], 2.0 * M_PI);
+        if (phi_[j] < 0.0)
+          phi_[j] = std::fmod(phi_[j], 2.0 * M_PI);
 
         // save the joint command into q_goal vector in the same joint order
         q_goal(j) = q_d_j;
 
         // (optional) store last q_goal for diagnostics
-        last_q_goal[j] = q_d_j;
+        last_q_goal_[j] = q_d_j;
       } // end per-joint loop
     } // end if handshake_active_
 
-    // Publish and run your impedance controller as before
-    publish_commanded_pose(q_goal);
-    publish_actual_pose(q_);
+    // Publish and run impedance controller
+    publish_commanded_pose(this->controller_elapsed_time_, q_goal);
+    publish_actual_pose(this->controller_elapsed_time_, q_);
 
     // velocity filtering & PD-based torque calculation (unchanged)
     const double kAlpha = 0.99;
@@ -430,6 +365,24 @@ namespace franka_handshake_controllers
     this->handshake_base_frequency_ = goal_handle->get_goal()->frequency;
     this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
     this->handshake_synchrony_factor_ = goal_handle->get_goal()->synchrony_factor;
+
+    // --- Derived scalar timing used by envelope (same as before) ---
+    double omega_base_ = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
+    if (omega_base_ <= 0.0)
+    {
+      RCLCPP_WARN(get_node()->get_logger(), "Omega is non-positive, skipping handshake trajectory.");
+      return;
+    }
+
+    for (int j = 0; j < num_joints; ++j)
+    {
+      phi_[j] = M_PI / 2.0;
+      omega_[j] = omega_base_;
+      C_[j] = 0.5 * (Q1_[j] + Q2_[j]);
+      A_[j] = 0.5 * (Q2_[j] - Q1_[j]);
+      e_t_filt_[j] = 0.0;
+      last_q_goal_[j] = C_[j];
+    }
   }
 
   void HandShakeController::handle_action_server_progress(double elapsed_time)
@@ -470,22 +423,24 @@ namespace franka_handshake_controllers
     }
   }
 
-  void HandShakeController::publish_commanded_pose(const Vector7d &q_goal)
+  void HandShakeController::publish_commanded_pose(double timestamp, const Vector7d &q_goal)
   {
     std_msgs::msg::Float64MultiArray msg;
-    msg.data.resize(7);
-    for (int i = 0; i < 7; ++i)
+    msg.data.resize(8);
+    msg.data[0] = timestamp;
+    for (int i = 1; i < 8; ++i)
     {
       msg.data[i] = q_goal(i);
     }
     this->commanded_pose_pub_->publish(msg);
   }
 
-  void HandShakeController::publish_actual_pose(const Vector7d &q_actual)
+  void HandShakeController::publish_actual_pose(double timestamp, const Vector7d &q_actual)
   {
     std_msgs::msg::Float64MultiArray msg;
-    msg.data.resize(7);
-    for (int i = 0; i < 7; ++i)
+    msg.data.resize(8);
+    msg.data[0] = timestamp;
+    for (int i = 1; i < 8; ++i)
     {
       msg.data[i] = q_actual(i);
     }
