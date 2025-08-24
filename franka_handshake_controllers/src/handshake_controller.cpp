@@ -104,7 +104,7 @@ namespace franka_handshake_controllers
 
       for (int j = 0; j < num_joints; ++j)
         RCLCPP_INFO(get_node()->get_logger(),
-                    "Adaptive state %d initialized as: %f, %f, %f, %f, %f, %f, %f",
+                    "Adaptive state %d initialized as: %d, %f, %f, %f, %f, %f, %f",
                     j, phi_[j], omega_[j], A_[j], C_[j], e_t_filt_[j], last_q_goal_[j]);
 
       double dt = period.seconds();
