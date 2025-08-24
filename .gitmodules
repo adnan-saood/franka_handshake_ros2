@@ -1,6 +1,6 @@
-[submodule "franka_arm_ros2"]
-	path = franka_arm_ros2
-	url = https://github.com/LCAS/franka_arm_ros2
 [submodule "mekahand_description"]
 	path = mekahand_description
 	url = git@github.com:adnan-saood/mekahand_description.git
+[submodule "franka_arm_ros2"]
+	path = franka_arm_ros2
+	url = https://github.com/LCAS/franka_arm_ros2
