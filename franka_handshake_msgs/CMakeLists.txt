@@ -14,6 +14,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
     "action/Handshake.action"
+    "action/SetGains.action"
     DEPENDENCIES std_msgs geometry_msgs sensor_msgs builtin_interfaces
 )
 

@@ -33,7 +33,8 @@ find_package(franka_handshake_msgs REQUIRED)
 add_library(
         ${PROJECT_NAME}
         SHARED
-        src/handshake_controller.cpp)
+        src/handshake_controller.cpp
+        src/handshake_controller_interfaces.cpp)
 target_include_directories(
         ${PROJECT_NAME}
         PUBLIC

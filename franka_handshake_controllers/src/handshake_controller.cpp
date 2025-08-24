@@ -8,6 +8,7 @@
 #include <thread>
 #include <Eigen/Eigen>
 
+
 namespace franka_handshake_controllers
 {
   using Handshake = franka_handshake_msgs::action::Handshake;
@@ -168,11 +169,24 @@ namespace franka_handshake_controllers
     publish_commanded_pose(this->controller_elapsed_time_, q_goal);
     publish_actual_pose(this->controller_elapsed_time_, q_);
 
+    if (blending_)
+    {
+      double a = std::min(1.0, blend_t_ / blend_T_);
+      double s = a * a * (3.0 - 2.0 * a); // smoothstep
+      {
+        k_curr_ = (1.0 - s) * k_curr_ + s * k_target_;
+        d_curr_ = (1.0 - s) * d_curr_ + s * d_target_;
+      }
+      blend_t_ += period.seconds();
+      if (a >= 1.0)
+        blending_ = false;
+    }
+
     // velocity filtering & PD-based torque calculation (unchanged)
     const double kAlpha = 0.99;
     dq_filtered_ = (1 - kAlpha) * dq_filtered_ + kAlpha * dq_;
     Vector7d tau_d_calculated =
-        k_gains_.cwiseProduct(q_goal - q_) + d_gains_.cwiseProduct(-dq_filtered_);
+        k_curr_.cwiseProduct(q_goal - q_) + d_curr_.cwiseProduct(-dq_filtered_);
     for (int i = 0; i < num_joints; ++i)
     {
       command_interfaces_[i].set_value(tau_d_calculated(i));
@@ -231,6 +245,8 @@ namespace franka_handshake_controllers
       {
         d_gains_(i) = d_gains.at(i);
         k_gains_(i) = k_gains.at(i);
+        k_curr_(i) = k_gains_(i);
+        d_curr_(i) = d_gains_(i);
       }
       dq_filtered_.setZero();
 
@@ -249,7 +265,7 @@ namespace franka_handshake_controllers
         RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
       }
 
-      arm_id_ = "fr3";
+      arm_id_ = "panda";
 
       freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
           "franka_handshake_tuning_freq", 10,
@@ -270,6 +286,16 @@ namespace franka_handshake_controllers
           std::bind(&HandShakeController::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
           std::bind(&HandShakeController::handle_cancel, this, std::placeholders::_1),
           std::bind(&HandShakeController::handle_accepted, this, std::placeholders::_1));
+
+      set_gains_server_ = rclcpp_action::create_server<SetGains>(
+          get_node()->get_node_base_interface(),
+          get_node()->get_node_clock_interface(),
+          get_node()->get_node_logging_interface(),
+          get_node()->get_node_waitables_interface(),
+          "set_gains",
+          std::bind(&HandShakeController::handle_gains_goal, this, std::placeholders::_1, std::placeholders::_2),
+          std::bind(&HandShakeController::handle_gains_cancel, this, std::placeholders::_1),
+          std::bind(&HandShakeController::handle_gains_accepted, this, std::placeholders::_1));
     }
     catch (const std::exception &e)
     {
@@ -327,53 +353,6 @@ namespace franka_handshake_controllers
     }
   }
 
-  using namespace std::chrono_literals;
-
-  rclcpp_action::GoalResponse HandShakeController::handle_goal(
-      const rclcpp_action::GoalUUID &,
-      std::shared_ptr<const franka_handshake_msgs::action::Handshake::Goal> /*goal*/)
-  {
-    RCLCPP_INFO(get_node()->get_logger(), "Received handshake goal");
-    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-  }
-
-  rclcpp_action::CancelResponse HandShakeController::handle_cancel(
-      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> /*goal_handle*/)
-  {
-    RCLCPP_INFO(get_node()->get_logger(), "Handshake goal canceled");
-    handshake_active_ = false;
-    return rclcpp_action::CancelResponse::ACCEPT;
-  }
-
-  void HandShakeController::handle_accepted(
-      const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> goal_handle)
-  {
-    RCLCPP_INFO(get_node()->get_logger(), "Handshake goal accepted");
-    handshake_active_ = true;
-    active_goal_handle_ = goal_handle;
-    this->handshake_amplitude_ = goal_handle->get_goal()->amplitude;
-    this->handshake_base_frequency_ = goal_handle->get_goal()->frequency;
-    this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
-    this->handshake_synchrony_factor_ = goal_handle->get_goal()->synchrony_factor;
-
-    // --- Derived scalar timing used by envelope (same as before) ---
-    double omega_base_ = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
-    if (omega_base_ <= 0.0)
-    {
-      RCLCPP_WARN(get_node()->get_logger(), "Omega is non-positive, skipping handshake trajectory.");
-      return;
-    }
-
-    for (int j = 0; j < num_joints; ++j)
-    {
-      phi_[j] = M_PI / 2.0;
-      omega_[j] = omega_base_;
-      C_[j] = 0.5 * (Q1_[j] + Q2_[j]);
-      A_[j] = 0.5 * (Q2_[j] - Q1_[j]);
-      e_t_filt_[j] = 0.0;
-      last_q_goal_[j] = C_[j];
-    }
-  }
 
   void HandShakeController::handle_action_server_progress(double elapsed_time)
   {
@@ -413,34 +392,10 @@ namespace franka_handshake_controllers
     }
   }
 
-  void HandShakeController::publish_commanded_pose(double timestamp, const Vector7d &q_goal)
-  {
-    std_msgs::msg::Float64MultiArray msg;
-    msg.data.resize(8);
-    msg.data[0] = timestamp;
-    for (int i = 1; i < 8; ++i)
-    {
-      msg.data[i] = q_goal(i);
-    }
-    this->commanded_pose_pub_->publish(msg);
-  }
-
-  void HandShakeController::publish_actual_pose(double timestamp, const Vector7d &q_actual)
-  {
-    std_msgs::msg::Float64MultiArray msg;
-    msg.data.resize(8);
-    msg.data[0] = timestamp;
-    for (int i = 1; i < 8; ++i)
-    {
-      msg.data[i] = q_actual(i);
-    }
-    this->actual_pose_pub_->publish(msg);
-  }
-
   double HandShakeController::min_jerk(double tau)
   {
     tau = std::clamp(tau, 0.0, 1.0);
-    double tau_3 = tau*tau*tau;
+    double tau_3 = tau * tau * tau;
     return 10.0 * tau_3 - 15.0 * tau_3 * tau + 6.0 * tau_3 * tau * tau;
   }
 

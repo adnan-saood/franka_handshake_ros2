@@ -24,6 +24,7 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 
 #include "franka_handshake_msgs/action/handshake.hpp"
+#include "franka_handshake_msgs/action/set_gains.hpp"
 #include <rclcpp_action/rclcpp_action.hpp>
 
 using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
@@ -38,6 +39,8 @@ namespace franka_handshake_controllers
     {
     public:
         using Vector7d = Eigen::Matrix<double, 7, 1>;
+        using SetGains = franka_handshake_msgs::action::SetGains;
+        using GoalHandleSetGains = rclcpp_action::ServerGoalHandle<SetGains>;
         [[nodiscard]] controller_interface::InterfaceConfiguration command_interface_configuration()
             const override;
         [[nodiscard]] controller_interface::InterfaceConfiguration state_interface_configuration()
@@ -62,6 +65,16 @@ namespace franka_handshake_controllers
 
         void handle_accepted(
             const std::shared_ptr<rclcpp_action::ServerGoalHandle<franka_handshake_msgs::action::Handshake>> goal_handle);
+
+        rclcpp_action::GoalResponse handle_gains_goal(
+            const rclcpp_action::GoalUUID &uuid,
+            std::shared_ptr<const SetGains::Goal> goal);
+
+        rclcpp_action::CancelResponse handle_gains_cancel(
+            const std::shared_ptr<GoalHandleSetGains> goal_handle);
+
+        void handle_gains_accepted(
+            const std::shared_ptr<GoalHandleSetGains> goal_handle);
 
         // Store handshake parameters
         double handshake_amplitude_;
@@ -135,6 +148,17 @@ namespace franka_handshake_controllers
         const double omega_nominal = omega_base_;
 
         Vector7d Q1_, Q2_;
+
+        // Dynamic loading of impedance controller gains.
+        rclcpp_action::Server<SetGains>::SharedPtr set_gains_server_;
+        Vector7d k_curr_, d_curr_;
+        Vector7d k_target_, d_target_;
+
+        double blend_T_ = 0.5;
+        double blend_t_ = 0.0;
+        bool blending_ = false;
+
+        // std::mutex gain_mtx_;
     };
 
 } // namespace franka_handshake_controllers

@@ -1,0 +1,10 @@
+# Request
+float64[7] k_gains
+float64[7] d_gains
+---
+# Result
+bool success
+string message
+---
+# Feedback
+float64 progress  # 0.0 → 1.0 ramp progress
