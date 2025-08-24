@@ -90,17 +90,7 @@ namespace franka_handshake_controllers
       };
 
       // Envelope E(t) (same as before)
-      double E = 1.0;
-      if (t_now < T_half)
-      {
-        double tau = t_now / T_half;
-        E = min_jerk(tau);
-      }
-      else if (t_now > (T_total - T_half))
-      {
-        double tau = (T_total - t_now) / T_half;
-        E = min_jerk(tau);
-      }
+      double E = compute_envelope(t_now, T_half, T_total);
 
       for (int j = 0; j < num_joints; ++j)
         RCLCPP_INFO(get_node()->get_logger(),
@@ -445,6 +435,23 @@ namespace franka_handshake_controllers
       msg.data[i] = q_actual(i);
     }
     this->actual_pose_pub_->publish(msg);
+  }
+
+  double HandShakeController::min_jerk(double tau)
+  {
+    tau = std::clamp(tau, 0.0, 1.0);
+    double tau_3 = tau*tau*tau;
+    return 10.0 * tau_3 - 15.0 * tau_3 * tau + 6.0 * tau_3 * tau * tau;
+  }
+
+  double HandShakeController::compute_envelope(double t_now, double T_half, double T_total)
+  {
+    if (t_now < T_half)
+      return min_jerk(t_now / T_half);
+    else if (t_now > (T_total - T_half))
+      return min_jerk((T_total - t_now) / T_half);
+    else
+      return 1.0;
   }
 
 } // namespace franka_handshake_controllers

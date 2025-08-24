@@ -96,6 +96,8 @@ namespace franka_handshake_controllers
         Vector7d d_gains_;
         double controller_elapsed_time_{0.0};
         void updateJointStates();
+        double min_jerk(double tau);
+        double compute_envelope(double t_now, double T_half, double T_total);
 
         Vector7d dQ1_, dQ2_;
 
