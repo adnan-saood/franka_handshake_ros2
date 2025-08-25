@@ -154,7 +154,7 @@ namespace franka_handshake_controllers
         Vector7d k_curr_, d_curr_;
         Vector7d k_target_, d_target_;
 
-        double blend_T_ = 0.5;
+        double blend_T_ = 5.0;
         double blend_t_ = 0.0;
         bool blending_ = false;
 

@@ -13,17 +13,12 @@ namespace franka_handshake_controllers
 {
   using Handshake = franka_handshake_msgs::action::Handshake;
   using GoalHandleHandshake = rclcpp_action::ServerGoalHandle<Handshake>;
+  using CInterface = controller_interface::InterfaceConfiguration;
 
-  void HandShakeController::freq_callback(const std_msgs::msg::Float64::SharedPtr msg)
-  {
-    handshake_tuning_ = msg->data;
-    RCLCPP_INFO(get_node()->get_logger(), "Handshake tuning frequency updated to: %f Hz", handshake_tuning_);
-  }
-
-  controller_interface::InterfaceConfiguration
+  CInterface
   HandShakeController::command_interface_configuration() const
   {
-    controller_interface::InterfaceConfiguration config;
+    CInterface config;
     config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
     for (int i = 1; i <= num_joints; ++i)
     {
@@ -32,10 +27,10 @@ namespace franka_handshake_controllers
     return config;
   }
 
-  controller_interface::InterfaceConfiguration
+  CInterface
   HandShakeController::state_interface_configuration() const
   {
-    controller_interface::InterfaceConfiguration config;
+    CInterface config;
     config.type = controller_interface::interface_configuration_type::INDIVIDUAL;
     for (int i = 1; i <= num_joints; ++i)
     {
@@ -67,13 +62,8 @@ namespace franka_handshake_controllers
 
     if (this->handshake_active_)
     {
-      // --- Setup Q1/Q2 as before (joint offsets from initial_q_) ---
-      Vector7d QS = initial_q_;
-      Q1_ = initial_q_;
-      Q2_ = initial_q_;
-
-      Q1_ += dQ1_; // lower point offsets
-      Q2_ += dQ2_; // upper point offsets
+      Q1_ = initial_q_ + dQ1_;
+      Q2_ = initial_q_ + dQ2_;
 
       double T_half = M_PI / omega_base_;
       int k_total = this->handshake_n_oscillations_;
@@ -82,13 +72,6 @@ namespace franka_handshake_controllers
       // Elapsed time since handshake start, clamped
       double t_now = controller_elapsed_time_ - handshake_start_time_;
       t_now = std::clamp(t_now, 0.0, T_total);
-
-      // minimum-jerk ramp (same as before)
-      auto min_jerk = [](double tau)
-      {
-        tau = std::clamp(tau, 0.0, 1.0);
-        return 10.0 * tau * tau * tau - 15.0 * tau * tau * tau * tau + 6.0 * tau * tau * tau * tau * tau;
-      };
 
       // Envelope E(t) (same as before)
       double E = compute_envelope(t_now, T_half, T_total);
@@ -199,7 +182,7 @@ namespace franka_handshake_controllers
   {
     try
     {
-      auto_declare<std::string>("arm_id", "");
+      auto_declare<std::string>("arm_id", "panda");
       auto_declare<std::vector<double>>("k_gains", {});
       auto_declare<std::vector<double>>("d_gains", {});
     }
@@ -350,45 +333,6 @@ namespace franka_handshake_controllers
 
       q_(i) = position_interface.get_value();
       dq_(i) = velocity_interface.get_value();
-    }
-  }
-
-
-  void HandShakeController::handle_action_server_progress(double elapsed_time)
-  {
-    if (handshake_active_)
-    {
-      if (handshake_start_time_ == 0.0)
-      {
-        handshake_start_time_ = elapsed_time;
-      }
-      double elapsed = elapsed_time - handshake_start_time_;
-
-      double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0;
-      if (duration <= 0.0)
-      {
-        RCLCPP_WARN(get_node()->get_logger(), "Handshake duration is non-positive, aborting.");
-        handshake_active_ = false;
-        handshake_start_time_ = 0.0;
-        active_goal_handle_.reset();
-        return;
-      }
-      double progress = std::clamp(elapsed / duration, 0.0, 1.0);
-
-      auto feedback = std::make_shared<Handshake::Feedback>();
-      feedback->progress = progress;
-      active_goal_handle_->publish_feedback(feedback);
-
-      if (elapsed >= duration)
-      {
-        auto result = std::make_shared<Handshake::Result>();
-        result->success = true;
-        result->message = "Handshake complete";
-        active_goal_handle_->succeed(result);
-        handshake_active_ = false;
-        handshake_start_time_ = 0.0;
-        active_goal_handle_.reset();
-      }
     }
   }
 

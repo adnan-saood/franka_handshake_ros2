@@ -93,8 +93,8 @@ def generate_launch_description():
             description='Default value: franka_hand')
     arm_id_launch_argument = DeclareLaunchArgument(
             arm_id_name,
-            default_value='fr3',
-            description='Available values: fr3, fp3 and fer')
+            default_value='panda',
+            description='Available values: panda, fp3 and fer')
     namespace_launch_argument = DeclareLaunchArgument(
         namespace_name,
         default_value='',
@@ -129,7 +129,7 @@ def generate_launch_description():
         package='ros_gz_sim',
         executable='create',
         namespace=namespace,
-        arguments=['-topic', '/robot_description', '--name', 'fr3'],
+        arguments=['-topic', '/robot_description', '--name', 'panda'],
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
     )

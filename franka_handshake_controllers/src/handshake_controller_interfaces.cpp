@@ -8,12 +8,16 @@
 #include <thread>
 #include <Eigen/Eigen>
 
-
-
 namespace franka_handshake_controllers
 {
 
     using namespace std::chrono_literals;
+
+    void HandShakeController::freq_callback(const std_msgs::msg::Float64::SharedPtr msg)
+    {
+        handshake_tuning_ = msg->data;
+        RCLCPP_INFO(get_node()->get_logger(), "Handshake tuning frequency updated to: %f Hz", handshake_tuning_);
+    }
 
     rclcpp_action::GoalResponse HandShakeController::handle_goal(
         const rclcpp_action::GoalUUID &,
@@ -58,6 +62,44 @@ namespace franka_handshake_controllers
             A_[j] = 0.5 * (Q2_[j] - Q1_[j]);
             e_t_filt_[j] = 0.0;
             last_q_goal_[j] = C_[j];
+        }
+    }
+
+    void HandShakeController::handle_action_server_progress(double elapsed_time)
+    {
+        if (handshake_active_)
+        {
+            if (handshake_start_time_ == 0.0)
+            {
+                handshake_start_time_ = elapsed_time;
+            }
+            double elapsed = elapsed_time - handshake_start_time_;
+
+            double duration = (double)handshake_n_oscillations_ / handshake_base_frequency_ / 2.0;
+            if (duration <= 0.0)
+            {
+                RCLCPP_WARN(get_node()->get_logger(), "Handshake duration is non-positive, aborting.");
+                handshake_active_ = false;
+                handshake_start_time_ = 0.0;
+                active_goal_handle_.reset();
+                return;
+            }
+            double progress = std::clamp(elapsed / duration, 0.0, 1.0);
+
+            auto feedback = std::make_shared<Handshake::Feedback>();
+            feedback->progress = progress;
+            active_goal_handle_->publish_feedback(feedback);
+
+            if (elapsed >= duration)
+            {
+                auto result = std::make_shared<Handshake::Result>();
+                result->success = true;
+                result->message = "Handshake complete";
+                active_goal_handle_->succeed(result);
+                handshake_active_ = false;
+                handshake_start_time_ = 0.0;
+                active_goal_handle_.reset();
+            }
         }
     }
 
