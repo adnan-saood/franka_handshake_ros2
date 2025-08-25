@@ -8,7 +8,6 @@
 #include <thread>
 #include <Eigen/Eigen>
 
-
 namespace franka_handshake_controllers
 {
   using Handshake = franka_handshake_msgs::action::Handshake;
