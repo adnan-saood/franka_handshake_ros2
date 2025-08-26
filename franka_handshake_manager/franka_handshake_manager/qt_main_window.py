@@ -1,6 +1,18 @@
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel
 )
+import rclpy
+from rclpy.action import ActionClient
+from franka_handshake_msgs.action import SetGains
+
+# Example gains (replace with your desired values or get from UI)
+k_gains = [24.0, 24.0, 24.0, 24.0, 10.0, 6.0, 2.0]
+d_gains = [2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 0.5]
+
+
+
+def feedback_callback(feedback_msg):
+    print(f"Feedback: {feedback_msg.feedback.progress}")
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -43,6 +55,13 @@ class MainWindow(QMainWindow):
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
+        rclpy.init(args=None)
+        self.node = rclpy.create_node('qt_handshake_manager')
+
+
+        self.gains_client = ActionClient(self.node, SetGains, '/set_gains')
+
+
     def launch_robot(self):
         # TODO: Add logic to launch robot bringup
         print("Launching robot bringup...")
@@ -52,12 +71,28 @@ class MainWindow(QMainWindow):
         print("Loading handshake controller...")
 
     def send_action1(self):
-        # TODO: Add logic to send action request to server 1
+
         print("Sending action request to server 1...")
 
     def send_action2(self):
-        # TODO: Add logic to send action request to server 2
+        goal_msg = SetGains.Goal()
+        goal_msg.k_gains = k_gains
+        goal_msg.d_gains = d_gains
         print("Sending action request to server 2...")
+
+        future = self.gains_client.send_goal_async(goal_msg, feedback_callback=feedback_callback)
+        rclpy.spin_until_future_complete(self.node, future)
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            print("Action request rejected.")
+        else:
+            print("Action request accepted.")
+
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self.node, result_future)
+        result = result_future.result().result
+        print(f"Result: success={result.success}, message={result.message}")
+
 
     def toggle_rosbag(self):
         # TODO: Add logic to start/stop rosbag with folder name from self.folder_input.text()
