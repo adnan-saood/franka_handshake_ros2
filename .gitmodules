@@ -4,6 +4,3 @@
 [submodule "franka_arm_ros2"]
 	path = franka_arm_ros2
 	url = https://github.com/LCAS/franka_arm_ros2
-[submodule "libfranka"]
-	path = libfranka
-	url = https://github.com/frankaemika/libfranka.git
