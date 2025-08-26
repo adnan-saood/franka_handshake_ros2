@@ -97,6 +97,10 @@ namespace franka_handshake_controllers
         void publish_commanded_pose(double timestamp, const Vector7d &q_goal);
         void publish_actual_pose(double timestamp, const Vector7d &q_actual);
 
+        CallbackReturn get_parameters();
+        void setActionServers();
+        void setTopicPublishersSubscribers();
+
     private:
         std::string arm_id_;
         std::string robot_description_;

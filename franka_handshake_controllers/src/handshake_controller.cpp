@@ -196,42 +196,19 @@ namespace franka_handshake_controllers
   CallbackReturn HandShakeController::on_configure(
       const rclcpp_lifecycle::State & /*previous_state*/)
   {
+    RCLCPP_INFO(get_node()->get_logger(), "Configuring HandShakeController");
     try
     {
-      arm_id_ = get_node()->get_parameter("arm_id").as_string();
-      auto k_gains = get_node()->get_parameter("k_gains").as_double_array();
-      auto d_gains = get_node()->get_parameter("d_gains").as_double_array();
-      if (k_gains.empty())
-      {
-        RCLCPP_FATAL(get_node()->get_logger(), "k_gains parameter not set");
-        return CallbackReturn::FAILURE;
-      }
-      if (k_gains.size() != static_cast<uint>(num_joints))
-      {
-        RCLCPP_FATAL(get_node()->get_logger(), "k_gains should be of size %d but is of size %ld",
-                     num_joints, k_gains.size());
-        return CallbackReturn::FAILURE;
-      }
-      if (d_gains.empty())
-      {
-        RCLCPP_FATAL(get_node()->get_logger(), "d_gains parameter not set");
-        return CallbackReturn::FAILURE;
-      }
-      if (d_gains.size() != static_cast<uint>(num_joints))
-      {
-        RCLCPP_FATAL(get_node()->get_logger(), "d_gains should be of size %d but is of size %ld",
-                     num_joints, d_gains.size());
-        return CallbackReturn::FAILURE;
-      }
-      for (int i = 0; i < num_joints; ++i)
-      {
-        d_gains_(i) = d_gains.at(i);
-        k_gains_(i) = k_gains.at(i);
-        k_curr_(i) = k_gains_(i);
-        d_curr_(i) = d_gains_(i);
-      }
+      RCLCPP_INFO(get_node()->get_logger(), "Getting parameters");
+      auto res = get_parameters();
+      if(res != CallbackReturn::SUCCESS)
+        return res;
+
+      RCLCPP_INFO(get_node()->get_logger(), "Parameters received");
+
       dq_filtered_.setZero();
 
+      RCLCPP_INFO(get_node()->get_logger(), "Getting robot_description from robot_state_publisher");
       auto parameters_client =
           std::make_shared<rclcpp::AsyncParametersClient>(get_node(), "robot_state_publisher");
       parameters_client->wait_for_service();
@@ -247,37 +224,12 @@ namespace franka_handshake_controllers
         RCLCPP_ERROR(get_node()->get_logger(), "Failed to get robot_description parameter.");
       }
 
-      arm_id_ = "panda";
+      RCLCPP_INFO(get_node()->get_logger(), "Setting up publishers and subscribers");
+      setTopicPublishersSubscribers();
+      RCLCPP_INFO(get_node()->get_logger(), "Setting up action servers");
+      setActionServers();
+      RCLCPP_INFO(get_node()->get_logger(), "Action servers set up successfully");
 
-      freq_sub_ = get_node()->create_subscription<std_msgs::msg::Float64>(
-          "franka_handshake_tuning_freq", 10,
-          std::bind(&HandShakeController::freq_callback, this, std::placeholders::_1));
-
-      this->commanded_pose_pub_ =
-          get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/commanded_pose", 10);
-
-      this->actual_pose_pub_ =
-          get_node()->create_publisher<std_msgs::msg::Float64MultiArray>("/actual_pose", 10);
-
-      handshake_action_server_ = rclcpp_action::create_server<Handshake>(
-          get_node()->get_node_base_interface(),
-          get_node()->get_node_clock_interface(),
-          get_node()->get_node_logging_interface(),
-          get_node()->get_node_waitables_interface(),
-          "handshake",
-          std::bind(&HandShakeController::handle_goal, this, std::placeholders::_1, std::placeholders::_2),
-          std::bind(&HandShakeController::handle_cancel, this, std::placeholders::_1),
-          std::bind(&HandShakeController::handle_accepted, this, std::placeholders::_1));
-
-      set_gains_server_ = rclcpp_action::create_server<SetGains>(
-          get_node()->get_node_base_interface(),
-          get_node()->get_node_clock_interface(),
-          get_node()->get_node_logging_interface(),
-          get_node()->get_node_waitables_interface(),
-          "set_gains",
-          std::bind(&HandShakeController::handle_gains_goal, this, std::placeholders::_1, std::placeholders::_2),
-          std::bind(&HandShakeController::handle_gains_cancel, this, std::placeholders::_1),
-          std::bind(&HandShakeController::handle_gains_accepted, this, std::placeholders::_1));
     }
     catch (const std::exception &e)
     {
