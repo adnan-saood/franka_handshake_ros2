@@ -55,14 +55,14 @@ namespace franka_handshake_controllers
     }
 
     Vector7d q_goal = initial_q_;
+    Q1_ = initial_q_ + dQ1_;
+    Q2_ = initial_q_ + dQ2_;
     controller_elapsed_time_ = controller_elapsed_time_ + period.seconds();
 
-    handle_action_server_progress(controller_elapsed_time_);
+    this->handle_action_server_progress(controller_elapsed_time_);
 
     if (this->handshake_active_)
     {
-      Q1_ = initial_q_ + dQ1_;
-      Q2_ = initial_q_ + dQ2_;
 
       double T_half = M_PI / omega_base_;
       int k_total = this->handshake_n_oscillations_;
@@ -74,11 +74,6 @@ namespace franka_handshake_controllers
 
       // Envelope E(t) (same as before)
       double E = compute_envelope(t_now, T_half, T_total);
-
-      for (int j = 0; j < num_joints; ++j)
-        RCLCPP_INFO(get_node()->get_logger(),
-                    "Adaptive state %d initialized as: %d, %f, %f, %f, %f, %f, %f",
-                    j, phi_[j], omega_[j], A_[j], C_[j], e_t_filt_[j], last_q_goal_[j]);
 
       double dt = period.seconds();
       const double alpha_e = dt / (tau_e + dt);
@@ -116,7 +111,7 @@ namespace franka_handshake_controllers
 
         // phase and frequency update (PLL-like with damping on omega)
         double phi_dot = omega_[j] + current_sync_gain * Kp * e_t_filt_[j];
-        double omega_dot = current_sync_gain * Komega * e_t_filt_[j] - lambda_omega * (omega_[j] - omega_nominal);
+        double omega_dot = current_sync_gain * Komega * e_t_filt_[j] - lambda_omega * (omega_[j] - omega_base_);
 
         // amplitude and center updates (gradient-descent style on squared position error)
         double A_dot = -current_sync_gain * Ka * e_q * std::cos(phi_[j]);
@@ -201,7 +196,7 @@ namespace franka_handshake_controllers
     {
       RCLCPP_INFO(get_node()->get_logger(), "Getting parameters");
       auto res = get_parameters();
-      if(res != CallbackReturn::SUCCESS)
+      if (res != CallbackReturn::SUCCESS)
         return res;
 
       RCLCPP_INFO(get_node()->get_logger(), "Parameters received");
@@ -229,7 +224,6 @@ namespace franka_handshake_controllers
       RCLCPP_INFO(get_node()->get_logger(), "Setting up action servers");
       setActionServers();
       RCLCPP_INFO(get_node()->get_logger(), "Action servers set up successfully");
-
     }
     catch (const std::exception &e)
     {
@@ -263,12 +257,25 @@ namespace franka_handshake_controllers
         dQ1_(i) = dQ1.at(i);
         dQ2_(i) = dQ2.at(i);
       }
+      Q1_ = initial_q_ + dQ1_;
+      Q2_ = initial_q_ + dQ2_;
+
+      for (int j = 0; j < num_joints; ++j)
+      {
+        phi_[j] = M_PI / 2.0;
+        omega_[j] = omega_base_;
+        C_[j] = 0.5 * (Q1_[j] + Q2_[j]);
+        A_[j] = 0.5 * (Q2_[j] - Q1_[j]);
+        e_t_filt_[j] = 0.0;
+        last_q_goal_[j] = C_[j];
+      }
     }
     catch (const std::exception &e)
     {
       RCLCPP_FATAL(get_node()->get_logger(), "Exception in on_activate: %s", e.what());
       return CallbackReturn::FAILURE;
     }
+
     return CallbackReturn::SUCCESS;
   }
 

@@ -146,9 +146,13 @@ namespace franka_handshake_controllers
         this->handshake_n_oscillations_ = goal_handle->get_goal()->n_oscillations;
         this->handshake_synchrony_factor_ = goal_handle->get_goal()->synchrony_factor;
 
+        RCLCPP_INFO(get_node()->get_logger(), "Handshake parameters: amplitude=%f, frequency=%f, n_oscillations=%f, synchrony_factor=%f",
+                    this->handshake_amplitude_, this->handshake_base_frequency_,
+                    this->handshake_n_oscillations_, this->handshake_synchrony_factor_);
+
         // --- Derived scalar timing used by envelope (same as before) ---
-        double omega_base_ = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
-        if (omega_base_ <= 0.0)
+        this->omega_base_ = 2.0 * M_PI * (handshake_base_frequency_ + handshake_tuning_);
+        if (this->omega_base_ <= 0.0)
         {
             RCLCPP_WARN(get_node()->get_logger(), "Omega is non-positive, skipping handshake trajectory.");
             return;
@@ -186,9 +190,17 @@ namespace franka_handshake_controllers
             }
             double progress = std::clamp(elapsed / duration, 0.0, 1.0);
 
-            auto feedback = std::make_shared<Handshake::Feedback>();
-            feedback->progress = progress;
-            active_goal_handle_->publish_feedback(feedback);
+            // Print feedback only every 10%
+            static int last_feedback_percent = -1;
+            int current_percent = static_cast<int>(progress * 10.0);
+
+            if (current_percent != last_feedback_percent && current_percent > 0)
+            {
+                auto feedback = std::make_shared<Handshake::Feedback>();
+                feedback->progress = progress;
+                active_goal_handle_->publish_feedback(feedback);
+                last_feedback_percent = current_percent;
+            }
 
             if (elapsed >= duration)
             {
